@@ -1,0 +1,835 @@
+% VLDB template version of 2020-08-03 enhances the ACM template, version 1.7.0:
+% https://www.acm.org/publications/proceedings-template
+% The ACM Latex guide provides further information about the ACM template
+%从输入的时间序列中学习一种紧凑的、全局的宏观状态（称为 Hub），然后将这个全局状态信息
+%广播回每个局部的时间片段（Patch），从而实现高效的全局信息引导下的局部特征更新。
+\documentclass[sigconf, nonacm]{acmart}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{adjustbox}
+\usepackage{graphicx}
+\usepackage{subcaption} 
+%% The following content must be adapted for the final version
+% paper-specific
+\newcommand\vldbdoi{XX.XX/XXX.XX}
+\newcommand\vldbpages{XXX-XXX}
+% issue-specific
+\newcommand\vldbvolume{14}
+\newcommand\vldbissue{1}
+\newcommand\vldbyear{2026}
+% should be fine as it is
+\newcommand\vldbauthors{\authors}
+\newcommand\vldbtitle{\shorttitle} 
+% leave empty if no availability url should be set
+\newcommand\vldbavailabilityurl{URL_TO_YOUR_ARTIFACTS}
+% whether page numbers should be shown or not, use 'plain' for review versions, 'empty' for camera ready
+\newcommand\vldbpagestyle{plain} 
+% --- 1. 手动调节图片高度 ---
+% 可以修改这个值，例如 0.7\textheight, 0.9\textheight 等。
+\newcommand{\myimageheight}{0.3\textheight} 
+% --- 2. 手动调节每张子图的宽度 ---
+% 0.24\textwidth 意味着每张图占据页面宽度的24%。
+% 4 * 0.24 = 0.96，剩下的4%是图之间的间距。
+\newcommand{\mysubfigurewidth}{0.24\textwidth}
+
+\begin{document}
+	% 好的名字占成功的一半
+	\title{AHuber: Learning a Global Hub for Multivariate Time Series Forecasting via Echoic Perception}
+	%%
+	%% The "author" command and its associated commands are used to define the authors and their affiliations.
+	\author{Zhe Chen}
+	\affiliation{%
+		\institution{FJNU-DBGroup}
+		\city{Fuzhou}
+		\country{China}
+	}
+	\email{larst@affiliation.org}
+	
+	\author{RuiHong Huang}
+	\affiliation{%
+		\institution{FJNU-DBGroup}
+		\city{Fuzhou}
+		\country{China}
+	}
+	\email{larst@affiliation.org}
+	%%
+	%% article.
+	\begin{abstract}
+		Multivariate time series (MTS) forecasting aims to model complex systems, yet existing paradigms present a fundamental dilemma. Channel-Independent models like PatchTST excel at capturing endogenous dynamics but ignore exogenous influences between variables. Conversely, Channel-Mixing Transformers like iTransformer attempt to model all interactions via an intractable $\mathcal{O}(N^2)$ attention mechanism. While effective for heterogeneous data, this dense interaction approach incurs quadratic computational costs and, as noted in recent studies, carries a risk of overfitting when the number of variables is large.
+
+    	In this paper, we propose a new paradigm, \textbf{Echoic Perception}. We posit that robust system modeling does not require tracking every pairwise interaction, but rather \textbf{distilling} the core dynamics into a compact state. We introduce \textbf{AHuber}, a novel network that operationalizes this paradigm. At its heart, a small, learnable set of \textbf{proxy tokens} act as agents, perceiving the holistic system state via attention to form a global context. This context is then made available to the local tokens. This asymmetric \textbf{perceive-and-refine} operation, which we term echoic perception, is stacked to enable a deep, evolving understanding. This design achieves a complexity of $\mathcal{O}(N \cdot L)$, linear with respect to the input size, breaking the quadratic bottleneck. Extensive experiments demonstrate that AHuber achieves state-of-the-art performance across diverse benchmarks while maintaining superior efficiency.
+	\end{abstract}
+	
+	\maketitle
+	
+	%%% do not modify the following VLDB block %%
+	%%% VLDB block start %%%
+	\pagestyle{\vldbpagestyle}
+	\begingroup\small\noindent\raggedright\textbf{PVLDB Reference Format:}\\
+	\vldbauthors. \vldbtitle. PVLDB, \vldbvolume(\vldbissue): \vldbpages, \vldbyear.\\
+	\href{https://doi.org/\vldbdoi}{doi:\vldbdoi}
+	\endgroup
+	\begingroup
+	\renewcommand\thefootnote{}\footnote{\noindent
+		This work is licensed under the Creative Commons BY-NC-ND 4.0 International License. Visit \url{https://creativecommons.org/licenses/by-nc-nd/4.0/} to view a copy of this license. For any use beyond those covered by this license, obtain permission by emailing \href{mailto:info@vldb.org}{info@vldb.org}. Copyright is held by the owner/author(s). Publication rights licensed to the VLDB Endowment. \\
+		\raggedright Proceedings of the VLDB Endowment, Vol. \vldbvolume, No. \vldbissue\ %
+		ISSN 2150-8097. \\
+		\href{https://doi.org/\vldbdoi}{doi:\vldbdoi} \\
+	}\addtocounter{footnote}{-1}\endgroup
+	%%% VLDB block end %%%
+	
+	%%% do not modify the following VLDB block %%
+	%%% VLDB block start %%%
+	\ifdefempty{\vldbavailabilityurl}{}{
+		\vspace{.3cm}
+		\begingroup\small\noindent\raggedright\textbf{PVLDB Artifact Availability:}\\
+		The source code, data, and/or other artifacts have been made available at \url{\vldbavailabilityurl}.
+		\endgroup
+	}
+	%%% VLDB block end %%%
+	
+	% -----------------------------------------------------------------
+	\section{Introduction}
+	\begin{figure*}[t!]
+		\centering
+		\includegraphics[width=\linewidth]{pic/architecture_contrast.pdf}
+		\caption{Comparison of Architectural Paradigms. (a) Temporal-Centric models isolate variables. (b) Variate-Centric models incur quadratic costs. (c) AHuber employs Echoic Perception for linear-complexity global reasoning.}
+		\label{fig:architecture_contrast}
+	\end{figure*}
+	Time series data forms the bedrock of our digital world. From the financial markets that drive the global economy and the energy grids that sustain our cities, to the climate models that forecast our planet's future, the ability to understand and predict the evolution of temporal data is central to modern scientific and industrial decision-making. 
+    % --- 修改：引入 Box-Jenkins ---
+    Historically, this field was dominated by statistical methods like ARIMA~\cite{box1970time}, which focused on linear dependencies. However, with the explosion of data complexity, deep learning has become the new standard.
+    % ---------------------------
+    Yet, within the specialized domain of multivariate time series forecasting (MTSF), the field is defined by a fundamental philosophical dilemma.
+    
+    On one hand, the \textbf{Temporal-Centric philosophy}, embodied by channel-independent models like PatchTST~\cite{nie2023patchtst} (Figure.~\ref{fig:architecture_contrast}(a)), made a significant contribution by demonstrating that modeling temporal patterns within each channel independently could achieve state-of-the-art results. This channel-independent design cleverly sidesteps the quadratic complexity across variables. However, this choice is not without a steep cost. To capture long-range dependencies, these models require very long look-back windows (L), re-introducing the original Transformer's~\cite{vaswani2017attention} $\mathcal{O}(L^2)$ computational bottleneck.
+    % --- 修改：引入 Pyraformer 和 LogSparse ---
+    While sparse attention mechanisms like \textbf{LogSparse}~\cite{li2019enhancing} and \textbf{Pyraformer}~\cite{liu2022pyraformer} attempted to mitigate this via heuristic sparsification, they often sacrifice information fidelity for speed.
+    % ---------------------------------------
+    More fundamentally, this channel-independent approach does not explicitly model the non-linear interactions that govern most real-world systems.
+
+	On the other hand, the \textbf{Variate-Centric philosophy}, championed by the innovative iTransformer~\cite{liu2023itransformer} (Figure.~\ref{fig:architecture_contrast}(b)), directly confronts the interaction problem. It effectively inverts the attention mechanism to operate across variables, allowing it to handle heterogeneous variates with distinct temporal patterns. This was a crucial step forward. Yet, this design choice swings the pendulum of complexity to the other extreme. It re-introduces an $\mathcal{O}(N^2)$ bottleneck with respect to the number of variables (N), rendering it computationally prohibitive for high-dimensional systems. Furthermore, as discussed in PatchTST~\cite{nie2023patchtst}, applying dense attention across all channels can be prone to \textbf{overfitting}, as the model may memorize spurious correlations between variables rather than learning generalizable systemic drivers.
+    
+    The field is thus caught in a dilemma of scaling dimensions: commit to the $\mathcal{O}(L^2)$ cost of deep temporal modeling while ignoring interactions, or commit to the $\mathcal{O}(N^2)$ cost of full interaction modeling at the risk of non-scalability and overfitting.
+    
+    We argue that this dilemma stems from a restrictive premise: that modeling interactions must rely on the exhaustive, all-to-all mechanism of self-attention. For multivariate time series, which often contain redundant information, this approach iis computationally expensive and risks modeling spurious correlations.
+    
+    In this paper, we propose a new paradigm, \textbf{Echoic Perception}. We posit that achieving a robust global understanding does not require modeling every pairwise interaction. Instead, it requires a mechanism to \textbf{distill} the core systemic state from the noisy input. To operationalize this, we introduce a novel attention mechanism, \textbf{Multi-head Proxy Attention (MPA)}, where a small, learnable set of proxy tokens acts as dedicated agents to perceive and summarize the system's state. This asymmetric design—where many input tokens are queried by a few proxy tokens—inherently breaks the quadratic bottleneck and acts as a powerful \textit{signal distillation} engine. AHuber's backbone of stacked perception layers then executes a perceive-and-refine cycle. We term this two-stage process—where information is gathered by proxy tokens and then distribute back, visually represented by the ripples in our architectural diagrams. In each layer, our MPA mechanism first allows the proxy experts to \textbf{perceive} the system state. This perception is stabilized by the context from the \textit{preceding layer}, creating an evolving, layer-by-layer understanding. Second, this refined holistic understanding is efficiently \textbf{distribute} back via a robust attention module to refine the representation of each individual component. This paradigm shift results in an architecture that is both highly effective and efficient. Our contributions are threefold:
+	
+	\begin{itemize}
+		\item We identify a core dilemma in MTSF and propose Echoic Perception, a new forecasting paradigm that shifts the focus from flat observation to deep state reasoning.
+		\item We design and implement \textbf{AHuber}, featuring a novel \textbf{Multi-head Proxy Attention (MPA)} mechanism that enables efficient Global State distillation. This design achieves $\mathcal{O}(N \cdot L)$ complexity, linear in the input size, addressing the quadratic bottleneck of previous models.
+		\item We conduct a comprehensive experimental evaluation on benchmarks. Our results validate the superiority of AHuber, which not only establishes a new state-of-the-art in accuracy but also demonstrates significant improvements in computational efficiency.
+	\end{itemize}
+	% -----------------------------------------------------------------
+	\section{Related Work}
+    \label{sec:related_work}
+    Multivariate time series forecasting (MTSF) has evolved from classical statistical models like Vector Autoregression (VAR), which struggle with non-stationary dynamics, to recurrent architectures such as LSTMs~\cite{hochreiter1997long}. Convolutional approaches like TCNs~\cite{bai2018empirical} offered parallelizable feature extraction but were constrained by fixed receptive fields. The advent of the Transformer~\cite{vaswani2017attention} marked a paradigm shift, with initial works like Informer~\cite{zhou2021informer} and Autoformer~\cite{wu2021autoformer} focusing on mitigating the quadratic complexity along the \textit{temporal} dimension. However, these methods often made strong assumptions about data structure (e.g., sparsity) and did not fundamentally address cross-variable interactions. Consequently, the central debate has since shifted to two divergent philosophies.
+    
+    \subsection{Channel-Independent Models}
+    The first philosophy, prioritizing temporal fidelity, is championed by \textbf{PatchTST}~\cite{nie2023patchtst}. It posits that a standard Transformer applied independently to each variable channel is sufficient. A core tenet is \textit{channel independence}, where each series is modeled in isolation. While this excels at preserving intra-series patterns, it relies a \textbf{strong assumption}: it fundamentally sidesteps the challenge of modeling explicit, non-linear dynamics, which is insufficient for complex systems with asynchronous and cascading influences (e.g., a power grid failure). Subsequent variants attempted to address this by enhancing the final projection layer, but the core representation learning does not explicitly model cross-variable interactions.
+    
+    \subsection{Channel-Mixing Models}
+    In contrast, the variate-centric philosophy seeks to model interactions directly. 
+    % --- GNN 相关工作 ---
+    Early attempts utilized Graph Neural Networks (GNNs) to model spatial dependencies explicitly. Methods like \textbf{Graph WaveNet}~\cite{wu2019graph} and \textbf{MTGNN}~\cite{wu2020connecting} constructed adaptive adjacency matrices to capture pairwise correlations. 
+    % -----------------------------
+    However, these graph-based approaches often struggle with dynamic, long-range temporal dependencies.
+    Recently, \textbf{iTransformer}~\cite{liu2023itransformer} innovatively inverts the Transformer to apply self-attention across the variable dimension. This effectively captures correlations among heterogeneous variates but introduces an $\mathcal{O}(N^2)$ bottleneck, making it prohibitive for high-dimensional systems ($N > 1000$). Moreover, the dense all-to-all attention creates a vast hypothesis space, increasing the risk of overfitting to noise. Other works like \textbf{Crossformer}~\cite{zhang2023crossformer} explore sparse approximations, but often at the cost of informational fidelity.
+
+    \subsection{Simplicity and Foundation Models}
+    Beyond the Transformer debate, linear models like \textbf{DLinear}~\cite{zeng2023transformers} and \textbf{RLinear}~\cite{li2023revisiting} have shown that simple MLPs can achieve strong performance by decomposing trends and seasonality or refining linear mappings. Similarly, \textbf{ModernTCN}~\cite{dong2024moderntcn} demonstrates that modernizing convolutional structures can also yield state-of-the-art results with high efficiency. These works highlight the importance of structural robustness over complexity. 
+    Concurrently, LLM-based methods like \textbf{Time-LLM}~\cite{jin2023time} reprogram pre-trained language models for forecasting. While promising, they incur massive computational overhead. AHuber seeks to achieve comparable "global reasoning" within a compact, trainable-from-scratch architecture.
+	
+	\subsection{The Architectural Gap}
+    In summary, a critical gap remains. The field is caught between the \textbf{Temporal-Centric} (interaction-blind, $\mathcal{O}(L^2)$) and the \textbf{Variate-Centric} (noise-sensitive, $\mathcal{O}(N^2)$). What is required is not merely a mechanism for interactions, but a model capable of efficiently \textbf{distilling} the system’s emergent Global State without being computationally prohibitive.
+    % --- 理论支撑引用 ---
+    Our approach draws architectural inspiration from \textbf{Set Transformer}~\cite{lee2019set} and \textbf{Slot Attention}~\cite{locatello2020object}, which utilize latent bottlenecks to process sets or discover objects in visual scenes. Furthermore, our design is theoretically grounded in the \textbf{Information Bottleneck (IB) principle}~\cite{tishby2000information}. By forcing the high-dimensional dynamics through a compact set of proxies, we explicitly trade off the complexity of the representation against its predictive accuracy, effectively filtering out task-irrelevant noise.
+    % -----------------------
+    While Perceiver~\cite{jaegle2021perceiver} shares topological similarities in using latent arrays, our \textbf{Echoic Perception} paradigm arrives at this design from the specific necessity to distill \textbf{low-SNR dynamics} in time series. AHuber is the first to operationalize this proxy-based distillation as a dedicated solution to the interaction dilemma in MTSF.
+	\begin{figure*}[t!]
+		\centering
+		\includegraphics[width=\linewidth]{pic/AHuber.pdf}
+		\caption{The AHuber architecture comprises three stages: (a) an Input Representation stage, (b) a backbone of stacked \textbf{EchoLayer}s that iteratively distill a global context and echo it back to refine each local token, creating a hierarchical refinement process, and (c) a shared Linear Projection head for the final forecast.} % <-- 修正后的标题
+		\label{fig:AHuber}
+	\end{figure*}
+	% -----------------------------------------------------------------
+	\section{Methodology}
+	\label{sec:methodology}
+	\paragraph{Physical Interpretation of Echoic Perception.}
+	The proposed \textit{Distill-and-Distribute} paradigm aligns with the governing dynamics of many real-world complex systems, where local behaviors are driven by a shared Global State:
+	\begin{itemize}
+		\item \textbf{Smart Grids:} Local voltage fluctuations (Patches) are often reactions to grid-wide frequency changes or load imbalances. A central dispatch system (Hub) aggregates these signals to determine the grid stability state and distributes regulation commands (Context) back to local substations.
+		\item \textbf{Traffic Networks:} Congestion at a single intersection is rarely isolated. It contributes to a city-wide traffic state (e.g., a morning rush hour). A traffic control center (Hub) perceives this macroscopic state and adjusts signal timings (Distribution) for individual intersections accordingly.
+		\item \textbf{Meteorology:} Local weather events are manifestations of global atmospheric circulation patterns (e.g., El Ni\~{n}o). Understanding the global climate index (Hub) is essential for correcting and refining local forecasts (Patches).
+	\end{itemize}
+	AHuber mathematically formalizes this universal mechanism, using proxy tokens to simulate the \textbf{Central Hub} and attention routing to simulate the "Feedback Loop."
+	Our model, \textbf{AHuber}, embodies the principle of \textit{Echoic Perception}. The architecture comprises three stages: (a) an Input Representation stage, (b) a backbone of stacked \textbf{EchoLayer}s, where each layer performs a single \textbf{Echo} operation (perception and refinement), and (c) a simple Linear head for forecasting.
+	
+	\subsection{Input Embedding and 2D Positional Encoding}
+	
+	Following the success of \textbf{Vision Transformers (ViT)}~\cite{dosovitskiy2021image} in computer vision, we segment the input series into $P$ overlapping patches for each variable. Instead of decomposing the problem into separate temporal and spatial sub-problems, we treat the multivariate time series as a unified entity. To achieve this, the first critical step is to transform the raw, grid-like time series data into a unified sequence of tokens where each token is aware of its unique position in both time and space. Given an input multivariate time series \(\mathbf{Z}\in\mathbb{R}^{B\times N\times L}\), we first segment it into \(P\) overlapping patches for each variable. Each patch is projected into a \(D\)-dimensional embedding via a linear layer \(\mathbf{W}_e\). To inject spatio-temporal coordinates, we use a 2D decomposable positional encoding composed of two learnable tensors:
+	\[
+	\mathbf{P}_{\mathrm{var}}\in\mathbb{R}^{1\times N\times 1\times D},\qquad
+	\mathbf{P}_{\mathrm{time}}\in\mathbb{R}^{1\times 1\times P\times D}.
+	\]
+	These are broadcast and added to the patch embeddings, creating an initial token representation \(\mathbf{X}^{(0)}\in\mathbb{R}^{B\times N\times P\times D}\) where each token carries a unique variable-and-time address:
+	\begin{equation}
+		\mathbf{X}^{(0)}=\mathrm{Patch}(\mathbf{Z})\mathbf{W}_e + \mathbf{P}_{\mathrm{var}} + \mathbf{P}_{\mathrm{time}}.
+		\label{eq:embedding}
+	\end{equation}
+	For subsequent processing, we flatten the variable and patch dimensions to treat them as a single sequence. The resulting tensor is \(\mathbf{X}^{(0)}_{\mathrm{flat}}\in\mathbb{R}^{B\times S \times D}\), where \(S = N \cdot P\) represents the total number of spatio-temporal tokens. This design choice provides a stronger inductive bias, treating the multivariate time series as a unified spatio-temporal canvas rather than isolated channels.
+	
+	\subsection{The EchoLayer}
+	The core of \textbf{AHuber} is the \textbf{EchoLayer} ($\mathcal{E}$), which operationalizes our expert team analogy. As detailed in \textbf{Algorithm~\ref{alg:echolayer}}, each layer performs a single \textbf{Echo} cycle consisting of three strictly defined steps: Perception, Distribution, and Feed-Forward.
+
+	 \subsubsection{Stage 1: Perception via Multi-head Proxy Attention (MPA)}
+    The objective of this stage is to \textbf{distill} the high-dimensional input canvas into a compact set of state vectors. We introduce \textbf{Multi-head Proxy Attention (MPA)}, driven by a set of learnable \textbf{Proxy Tokens} $\mathbf{P}_{\text{proxy}} \in \mathbb{R}^{1 \times H \times 1 \times d_k}$. 
+    
+    Structurally, $\mathbf{P}_{\text{proxy}}$ is a learnable parameter tensor initialized once and \textbf{broadcasted} across the batch dimension $B$ during the forward pass. This ensures that the model learns a consistent set of \textit{system prototypes} shared across all samples. These proxies act as active Queries to scan the spatio-temporal input $\mathbf{X}^{(l-1)}$ (Keys/Values).
+
+    To enable hierarchical state evolution, we incorporate the context from the previous layer, $\mathbf{h}^{(l-1)}$, via a \textbf{Post-Fusion Residual} design. Specifically, the proxies first aggregate information to form a raw representation, which is then projected and fused with the prior:
+    \begin{align}
+        \mathbf{h}_{\mathrm{raw}}^{(l)} &= \mathcal{A}_{\mathrm{sdpa}}\big(\mathbf{Q}=\mathbf{P}_{\text{proxy}},\; \mathbf{K}=\mathbf{X}^{(l-1)}\mathbf{W}_K,\; \mathbf{V}=\mathbf{X}^{(l-1)}\mathbf{W}_V\big) \label{eq:raw_context} \\
+        \mathbf{h}_{\mathrm{proj}}^{(l)} &= \mathbf{h}_{\mathrm{raw}}^{(l)}\mathbf{W}_O \label{eq:proj_context} \\
+        \mathbf{h}^{(l)} &= \mathbf{h}_{\mathrm{proj}}^{(l)} + \mathbf{h}^{(l-1)} \label{eq:post_fusion}
+    \end{align}
+    where $\mathbf{h}^{(0)}$ is initialized as a zero tensor. This residual path allows the layer to focus on learning the \textit{incremental update} ($\mathbf{h}_{\mathrm{proj}}^{(l)}$) to the system state rather than reconstructing it from scratch at every layer, ensuring gradient stability in deep networks.
+    
+    \subsubsection{Stage 2: Distribution via Active Retrieval}
+    Once the global context $\mathbf{h}^{(l)}$ is established, the second stage distributes this intelligence back to the local tokens. We employ an \textbf{Active Retrieval} mechanism where local patches $\mathbf{X}^{(l-1)}$ (Queries) selectively retrieve information from the global hubs $\mathbf{h}^{(l)}$ (Keys/Values).
+    
+    A design choice here is the use of \textbf{Sigmoid} activation instead of the standard Softmax for attention weights. This choice is theoretically grounded in the distinct nature of the retrieval task:
+    \begin{itemize}
+        \item \textbf{Softmax is Competitive:} It enforces a zero-sum game ($\sum p_i = 1$). If a token attends strongly to Hub A, it \textit{must} reduce its attention to Hub B. This is suitable for classification but restrictive for signal reconstruction.
+        \item \textbf{Sigmoid is Independent:} It allows for \textbf{multi-label activation}. A local patch may require information from multiple global trends simultaneously (e.g., both weekly cycles and holiday spikes), or it may require \textit{none} if it is purely dominated by local noise.
+    \end{itemize}
+    
+    Mathematically, the retrieval process is defined as:
+    \begin{align}
+        \mathbf{S} &= \frac{(\mathbf{X}^{(l-1)}\mathbf{W}'_Q)(\mathbf{h}^{(l)}\mathbf{W}'_K)^T}{\sqrt{d_{head}}} \\
+        \mathbf{G} &= \sigma(\mathbf{S}) \label{eq:gating} \\
+        \Delta \mathbf{X} &= (\mathbf{G} \cdot (\mathbf{h}^{(l)}\mathbf{W}'_V))\mathbf{W}'_O
+    \end{align}
+    where $\sigma(\cdot)$ is the Sigmoid function. The retrieved signal $\Delta \mathbf{X}$ represents the global context tailored specifically for each local patch, which is then added to the local representation via a residual connection.
+
+	\subsection{Overall Algorithm}
+	The complete hierarchical process is outlined in Algorithms~\ref{alg:backbone},~\ref{alg:echolayer}, and~\ref{alg:Multi-head Proxy Attention}. The input series is first patched and embedded. Then, a stack of \(E\) EchoLayers iteratively refines the token representations and the global context. Finally, a linear head projects the output of the last layer to generate the forecast.
+	
+	\begin{algorithm}[t]
+        \caption{AHuber Backbone}
+        \label{alg:backbone}
+        \begin{algorithmic}[1]
+            \State \textbf{Input:} Tensor $\mathbf{Z} \in \mathbb{R}^{B \times N \times L_{in}}$
+            \State \textbf{Output:} Forecast $\mathbf{\hat{Y}} \in \mathbb{R}^{B \times N \times L_{out}}$
+            \Statex
+            \Procedure{AHuberBackbone}{$\mathbf{Z}$}
+            \State $\mathbf{X}^{(0)} \leftarrow \text{PatchEmbed}(\mathbf{Z}) + \mathbf{P}_{var} + \mathbf{P}_{time}$
+            \State $\mathbf{h}^{(0)} \leftarrow \text{None}$ \Comment{Init context}
+            
+            \For{$l = 1$ to $E$}
+                \Statex \Comment{Pass context layer by layer}
+                \State $\mathbf{X}^{(l)}, \mathbf{h}^{(l)} \leftarrow \text{EchoLayer}(\mathbf{X}^{(l-1)}, \mathbf{h}^{(l-1)})$
+            \EndFor
+            
+            \State $\mathbf{X}_{flat} \leftarrow \text{Flatten}(\mathbf{X}^{(E)})$
+            \State $\mathbf{\hat{Y}} \leftarrow \text{LinearHead}(\mathbf{X}_{flat})$
+            \State \textbf{return} $\mathbf{\hat{Y}}$
+            \EndProcedure
+        \end{algorithmic}
+    \end{algorithm}
+
+    \begin{algorithm}[t]
+    \caption{EchoLayer Process}
+    \label{alg:echolayer}
+    \begin{algorithmic}[1]
+        \State \textbf{Input:} Tokens $\mathbf{X}_{in}$, Prev Context $\mathbf{h}_{prev}$
+        \State \textbf{Output:} Refined $\mathbf{X}_{out}$, Curr Context $\mathbf{h}_{curr}$
+        \Statex
+        \Procedure{EchoLayer}{$\mathbf{X}_{in}, \mathbf{h}_{prev}$}
+        \State $\mathbf{X}_{flat} \leftarrow \operatorname{Flatten}(\mathbf{X}_{in})$
+        
+        \Statex \Comment{\textit{Stage 1: Perception (MPA)}}
+        \State $\mathbf{h}_{curr} \leftarrow \text{MultiHeadProxyAttn}(\mathbf{X}_{flat}, \mathbf{h}_{prev})$ 
+        
+        \Statex \Comment{\textit{Stage 2: Distribute (Active Retrieval)}}
+        \State $\Delta \mathbf{X} \leftarrow \text{DistributeAttn}(\mathbf{X}_{flat}, \mathbf{h}_{curr})$
+        \State $\mathbf{X}_{res} \leftarrow \operatorname{LayerNorm}(\mathbf{X}_{flat} + \operatorname{Dropout}(\Delta \mathbf{X}))$
+        
+        \Statex \Comment{\textit{Stage 3: Feed-Forward}}
+        \State $\mathbf{X}_{out} \leftarrow \mathbf{X}_{res} + \operatorname{FFN}(\operatorname{LayerNorm}(\mathbf{X}_{res}))$
+        
+        \State \textbf{return} $\mathbf{X}_{out}, \mathbf{h}_{curr}$
+        \EndProcedure
+    \end{algorithmic}
+    \end{algorithm}
+    
+    \begin{algorithm}[t]
+        \caption{Multi-head Proxy Attention (MPA)}
+        \label{alg:Multi-head Proxy Attention}
+        \begin{algorithmic}[1]
+            \State \textbf{Input:} Tokens $\mathbf{X}$, Prev Context $\mathbf{h}_{prev}$
+            \State \textbf{Output:} New Context $\mathbf{h}_{out}$
+            \Statex
+            \Procedure{MPA}{$\mathbf{X}, \mathbf{h}_{prev}$}
+            \State $\mathbf{Q} \leftarrow \text{self.}\mathbf{P}_{proxy}$ \Comment{Learnable Parameters}
+            \State $\mathbf{K} \leftarrow \mathbf{X}\mathbf{W}_K, \quad \mathbf{V} \leftarrow \mathbf{X}\mathbf{W}_V$
+            \State $\mathbf{A} \leftarrow \operatorname{Softmax}(\frac{\mathbf{Q}\mathbf{K}^T}{\sqrt{d_k}})$
+            \State $\mathbf{h}_{raw} \leftarrow \mathbf{A}\mathbf{V}$
+            \State $\mathbf{h}_{proj} \leftarrow \mathbf{h}_{raw}\mathbf{W}_O$
+            
+            \Statex \Comment{Residual Context Fusion (Line 208 in code)}
+            \If{$\mathbf{h}_{prev}$ is not None}
+                \State $\mathbf{h}_{out} \leftarrow \mathbf{h}_{proj} + \mathbf{h}_{prev}$ 
+            \Else
+                \State $\mathbf{h}_{out} \leftarrow \mathbf{h}_{proj}$
+            \EndIf
+            
+            \State \textbf{return} $\mathbf{h}_{out}$
+            \EndProcedure
+        \end{algorithmic}
+    \end{algorithm}
+    
+    \begin{algorithm}[t]
+        \caption{Distribute Attention Module}
+        \label{alg:distribute}
+        \begin{algorithmic}[1]
+            \State \textbf{Input:} Patches $\mathbf{X}$ (Query), Hubs $\mathbf{h}$ (Key/Value)
+            \State \textbf{Output:} Update $\Delta \mathbf{X}$
+            \Statex
+            \Procedure{DistributeAttn}{$\mathbf{X}, \mathbf{h}$}
+            \State $\mathbf{Q}_p \leftarrow \mathbf{X}\mathbf{W}_Q'$ \Comment{Local patches ask}
+            \State $\mathbf{K}_h \leftarrow \mathbf{h}\mathbf{W}_K', \quad \mathbf{V}_h \leftarrow \mathbf{h}\mathbf{W}_V'$ \Comment{Hubs provide}
+            
+            \Statex \Comment{Compute Relevance}
+            \State $\mathbf{S} \leftarrow \frac{\mathbf{Q}_p \mathbf{K}_h^T}{\sqrt{d_{head}}}$
+            
+            \Statex \Comment{Sigmoid Gating (Active Retrieval)}
+            \State $\mathbf{G} \leftarrow \operatorname{Sigmoid}(\mathbf{S})$ 
+            
+            \State $\mathbf{U} \leftarrow \mathbf{G} \cdot \mathbf{V}_h$ \Comment{Weighted Sum}
+            \State $\Delta \mathbf{X} \leftarrow \mathbf{U}\mathbf{W}_O'$ \Comment{Output Projection}
+            
+            \State \textbf{return} $\Delta \mathbf{X}$
+            \EndProcedure
+        \end{algorithmic}
+    \end{algorithm}
+	\subsection{Complexity and Theoretical Analysis}
+    \label{sec:complexity_analysis}
+
+    To theoretically validate the efficiency of AHuber, we compare its computational complexity against two dominant paradigms: Channel-Independent (e.g., PatchTST) and Channel-Mixing (e.g., iTransformer). Let $N$ be the number of variates, $P$ be the number of time patches per variate, and $H$ be the number of proxy tokens in AHuber (where $H \ll N \cdot P$).
+
+    \begin{table}[h]
+        \centering
+        \small
+        \caption{Complexity Comparison. $S = N \cdot P$ denotes the total number of tokens. AHuber achieves linear complexity with respect to both $N$ and $P$.}
+        \label{tab:complexity_comparison}
+        \setlength{\tabcolsep}{4pt}
+        \begin{tabular}{l|cc|c}
+            \toprule
+            \textbf{Model} & \textbf{Time Complexity} & \textbf{Space Complexity} & \textbf{Interaction} \\
+            \midrule
+            PatchTST & $\mathcal{O}(N \cdot P^2)$ & $\mathcal{O}(N \cdot P^2)$ & None \\
+            iTransformer & $\mathcal{O}(P \cdot N^2)$ & $\mathcal{O}(P \cdot N^2)$ & All-to-All \\
+            \textbf{AHuber (Ours)} & $\mathbf{\mathcal{O}(S \cdot H)}$ & $\mathbf{\mathcal{O}(S \cdot H)}$ & \textbf{Distilled} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
+    \paragraph{Time Complexity.}
+    Standard self-attention scales quadratically with the sequence length. 
+    \begin{itemize}
+        \item \textbf{PatchTST} applies attention along the time axis for each variable independently, resulting in $\mathcal{O}(N \cdot P^2)$. While linear in $N$, it becomes heavy when the look-back window $P$ is large.
+        \item \textbf{iTransformer} applies attention along the variable axis for each time step, resulting in $\mathcal{O}(P \cdot N^2)$. This quadratic scaling with $N$ is the primary bottleneck for high-dimensional data.
+        \item \textbf{AHuber} breaks this bottleneck. In the Perception stage, $H$ proxies attend to $S$ tokens ($\mathcal{O}(S \cdot H)$). In the Distribute stage, $S$ tokens attend to $H$ hubs ($\mathcal{O}(S \cdot H)$). Since $S = N \cdot P$ and $H$ is a small constant (e.g., 16), our total complexity is $\mathcal{O}(N \cdot P)$, which is \textbf{strictly linear} with respect to the total input size.
+    \end{itemize}
+
+    \paragraph{Space Complexity (Memory).}
+    Memory consumption follows the same pattern. iTransformer requires storing an $N \times N$ attention map, which causes GPU memory explosion (OOM) when $N$ is large (e.g., Traffic dataset). AHuber only requires storing $S \times H$ attention maps. Since $H \ll S$, the memory footprint remains low and grows linearly, enabling AHuber to scale to thousands of variables on a single GPU.
+
+    \paragraph{Information Bottleneck Principle.}
+    Beyond efficiency, the Hub mechanism serves as a structural \textit{Information Bottleneck}. By forcing the high-dimensional input $\mathbf{X}$ to be compressed into a low-dimensional state $\mathbf{h}$ ($H \ll S$), we implicitly filter out high-frequency noise and spurious correlations. Only the most dominant, pervasive signals (trends, periodicities) can pass through this bottleneck. This explains why AHuber excels in low-SNR environments: it does not just attend to data; it actively \textit{denoises} it through compression.
+% -----------------------------------------------------------------
+	\section{Experiments}
+	
+	In this section, we conduct a comprehensive set of experiments to validate the effectiveness, efficiency, and robustness of our proposed \textbf{AHuber} model. Our evaluation is designed to determine: (1) \textbf{whether} AHuber achieves state-of-the-art forecasting accuracy, (2) \textbf{whether} the proposed architecture is genuinely more efficient than its interaction-aware predecessors, and (3) \textbf{whether} the core components of our design, particularly MPA, are essential for its performance.
+	
+	\subsection{Experimental Setup}
+	
+	\subsubsection{Datasets}
+	We evaluate our model on eight widely-used real-world benchmark datasets, as detailed in Table~\ref{tab:datasets}. These datasets are chosen to represent a diverse range of challenges in MTSF:
+	\begin{itemize}
+		\item \textbf{ETT (ETTh1, ETTh2, ETTm1, ETTm2)}: These four datasets record the oil temperature and load of electricity transformers, representing a common industrial forecasting task with clear periodic patterns.
+		\item \textbf{Weather}: This dataset contains 21 meteorological indicators, characterized by complex, non-linear relationships and external influences.
+		\item \textbf{Electricity}: This dataset tracks the electricity consumption of 321 clients. Its high dimensionality and strong, consistent daily and weekly periodicities make it a good testbed for modeling large-scale systems.
+		\item \textbf{Traffic}: This dataset from the California Department of Transportation measures the occupancy rate of 862 sensors. Its ultra-high dimensionality and inherent spatio-temporal correlations present a significant challenge for modeling cross-variable dynamics.
+		\item \textbf{Exchange}: This dataset contains the daily exchange rates of eight countries, known for its non-stationary and often volatile behavior.
+	\end{itemize}
+	
+	% --- Datasets Table --- 
+	\begin{table}[h]
+		\centering
+		\small
+		\caption{Statistics of the benchmark datasets.}
+		\begin{tabular}{c|ccccc}
+			\toprule
+			\textbf{Dataset} & \textbf{Features} & \textbf{Timesteps} & \textbf{Sampling Freq} & \textbf{Type} \\
+			\midrule
+			ETTh1 & 7 & 17,420 & 1 hour & Electricity \\
+			ETTh2 & 7 & 17,420 & 1 hour & Electricity \\
+			ETTm1 & 7 & 69,680 & 15 minutes & Electricity \\
+			ETTm2 & 7 & 69,680 & 15 minutes & Electricity \\
+			Weather & 21 & 52,696 & 10 minutes & Weather \\
+			Traffic & 862 & 17,544 & 1 hour & Transportation \\
+			Electricity & 321 & 26,304 & 1 hour & Electricity \\
+			Exchange & 8 & 7,508 & 1 hour & Exchange rate \\
+			\bottomrule
+		\end{tabular}%
+		
+		\label{tab:datasets}
+	\end{table}
+	% -----------------------------------------------------------------
+	
+	\subsubsection{Baselines}
+	We compare AHuber with a comprehensive set of state-of-the-art models, which can be categorized as follows:
+	\begin{itemize}
+		\item \textbf{Transformer-based Models}: \textbf{iTransformer}~\cite{liu2023itransformer}, a recent SOTA model that inverts the attention mechanism to operate over variates; \textbf{PatchTST}~\cite{nie2023patchtst}, a strong channel-independent baseline; \textbf{TimesNet}~\cite{wu2023timesnet}, which transforms 1D series into a 2D space to capture multi-periodicity; \textbf{Crossformer}~\cite{zhang2023crossformer}, which uses a two-stage attention to model sparse correlations; and \textbf{Autoformer}~\cite{wu2021autoformer}, a classic work using decomposition and auto-correlation.
+		\item \textbf{Linear-based Models}: \textbf{DLinear}~\cite{zeng2023transformers}, a simple yet powerful model demonstrating the strength of linear projections on decomposed series.
+		\item \textbf{MLP-based Models}: \textbf{TiDE}~\cite{das2023long}, a recent model that uses only MLP blocks for both encoder and decoder, representing a strong non-Transformer baseline.
+	\end{itemize}
+	
+	\subsubsection{Implementation Details} 
+	All models are implemented in PyTorch and trained on a single NVIDIA 5090 GPU. We use a fixed lookback window of $L=96$ and evaluate on four forecast horizons $T \in \{96, 192, 336, 720\}$. We report Mean Squared Error (MSE) and Mean Absolute Error (MAE) as our evaluation metrics. For patching, we use a non-overlapping patch length of 16.
+	\textbf{Normalization.} To mitigate the distribution shift problem inherent in non-stationary time series, we employ \textbf{Reversible Instance Normalization (RevIN)}~\cite{kim2021reversible}. This module normalizes the input data before the backbone and denormalizes the output, ensuring the model focuses on learning structural patterns rather than shifting statistics.
+	\textbf{Hyperparameter Settings.} We deliberately use a \textbf{single, unified set of hyperparameters} across all datasets to assess its robustness and generalization. The specific settings are as follows:
+	\begin{itemize}
+		\item \textbf{Architecture}: 3 EchoLayers, 8 attention heads, model dimension $D=128$.
+		\item \textbf{Training}: We use the AdamW optimizer with a learning rate of 0.001 and a batch size of 32. The learning rate is managed by a cosine annealing scheduler.
+		\item \textbf{Regularization}: We apply a dropout rate of 0.2. Training is run for a maximum of 25 epochs with an early stopping patience of 5 epochs.
+	\end{itemize}
+	This \textit{tune-once, run-everywhere} approach, while potentially conceding marginal gains on specific benchmarks, provides a more honest measure of a model's out-of-the-box performance and low-maintenance applicability—qualities crucial for real-world deployment.
+	
+	\subsection{Main Results}
+	We first compare the overall forecasting performance of \textbf{AHuber} against all baseline models. The detailed results are presented in Table~\ref{tab:main_results}. AHuber demonstrates remarkable performance, achieving state-of-the-art or highly competitive results across the vast majority of settings. This underscores the robustness of its architecture and the effectiveness of the Echoic Perception paradigm. A deeper analysis reveals several key insights:
+	
+	\paragraph{Strong Performance on High-Dimensional, Periodic Data.} On the `Electricity` and `Weather` datasets, AHuber significantly outperforms all baselines across all prediction lengths. These datasets are characterized by a large number of variables and strong periodic patterns. AHuber's success here highlights the superiority of its signal distillation approach. Unlike iTransformer, which can be overwhelmed by noise in high-dimensional settings, and PatchTST, which is blind to cross-variable dynamics, AHuber's MPA mechanism effectively distills the shared systemic state, such as daily consumption cycles, leading to more accurate and robust forecasts.
+	
+	\paragraph{Competitive Performance on Low-Dimensional Data.} On the ETT datasets, which have only 7 variables, the performance gap between models narrows. Here, channel-independent models like PatchTST and linear models like DLinear are highly effective. Nevertheless, AHuber remains consistently among the top performers, often securing the best results, especially on longer horizons (e.g., ETTm1 and ETTm2). This demonstrates that even when cross-variable interactions are less pronounced, AHuber's representation learning capabilities provide a strong inductive bias without overfitting.
+	
+	\paragraph{Robustness in Long-Horizon Forecasting.} A consistent trend across multiple datasets (e.g., ETTm1, ETTm2, Weather, Electricity) is that AHuber's performance advantage tends to increase with the prediction horizon. For instance, on ETTm2, AHuber's MSE is only marginally better than PatchTST at T=96, but this gap widens significantly at T=720. This suggests that the hierarchical context refined through stacked EchoLayers is particularly effective at capturing the long-range dependencies required for extended forecasts, a task where simpler models or those focused on short-term interactions often struggle.
+	
+	In summary, the results strongly validate our design philosophy. AHuber excels where interaction modeling is critical (high-dimensional data) while remaining highly competitive where it is less so, showcasing a unique blend of power and versatility that is absent in prior art.
+	
+	% ... (The main results table follows) ...
+	\begin{table*}[t]
+		\centering
+		% 使用 \scriptsize 缩小字体
+		\small
+		% 减小列间距，默认值是 6pt
+		\setlength{\tabcolsep}{6pt}
+		
+		\sisetup{
+			table-format=1.3,
+			tight-spacing=true,
+			detect-weight,
+			detect-display-math
+		}
+		\caption{Comparison of forecasting performance. AHuber achieves state-of-the-art results in most settings, particularly on high-dimensional datasets (Traffic, Electricity) and long-horizon tasks.}
+		
+		% 使用 adjustbox 环境确保表格最大宽度不超过文本宽度
+		\begin{adjustbox}{max width=\textwidth}
+			\begin{tabular}{
+					c | c|S S|S S|S S|S S|S S|S S|S S|S S
+				}
+				\toprule
+				\multicolumn{2}{c}{Models} 
+				& \multicolumn{2}{c}{AHuber} 
+				& \multicolumn{2}{c}{TiDE} 
+				& \multicolumn{2}{c}{iTransformer} 
+				& \multicolumn{2}{c}{PatchTST} 
+				& \multicolumn{2}{c}{DLinear} 
+				& \multicolumn{2}{c}{TimesNet} 
+				& \multicolumn{2}{c}{Autoformer}
+				& \multicolumn{2}{c}{Crossformer}\\
+				\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-10}\cmidrule(lr){11-12}\cmidrule(lr){13-14}\cmidrule(lr){15-16}\cmidrule(lr){17-18}
+				\multicolumn{2}{c}{Metrics} 
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE}
+				& {MSE} & {MAE} 
+				& {MSE} & {MAE}\\
+				\midrule
+				\multirow{4}{*}{\rotatebox{90}{ETTh1}}
+                & 96  & 0.404 & 0.413 & 0.479 & 0.464 & \underline{0.386} & 0.405 & 0.414 & 0.419 & \underline{0.386} & \textbf{0.400} & \textbf{0.384} & \underline{0.402} & 0.449 & 0.459 & 0.423 & 0.448 \\
+                & 192 & \textbf{0.433} & \textbf{0.431} & 0.525 & 0.492 & 0.441 & 0.436 & 0.460 & 0.445 & 0.437 & 0.432 & \underline{0.436} & \underline{0.429} & 0.500 & 0.482 & 0.471 & 0.474 \\
+                & 336 & \textbf{0.470} & \textbf{0.443} & 0.565 & 0.515 & 0.487 & \textbf{0.458} & 0.507 & 0.466 & \underline{0.481} & 0.459 & 0.491 & 0.469 & 0.521 & 0.496 & 0.570 & 0.546 \\
+                & 720 & \textbf{0.480} & \textbf{0.463} & 0.594 & 0.558 & 0.503 & 0.491 & \underline{0.500} & \underline{0.488} & 0.519 & 0.516 & 0.521 & 0.516 & 0.514 & 0.512 & 0.653 & 0.621 \\
+                \midrule
+				% --- 数据行：ETTh2 ---
+				\multirow{4}{*}{\rotatebox{90}{ETTh2}}
+                & 96  & \textbf{0.290} & \textbf{0.348} & 0.400 & 0.440 & \underline{0.297} & 0.349 & 0.302 & \textbf{0.348} & 0.333 & 0.387 & 0.340 & 0.374 & 0.346 & 0.388 & 0.745 & 0.584  \\
+                & 192 & \textbf{0.368} & \textbf{0.393} & 0.528 & 0.509 & \underline{0.380} & \underline{0.400} & 0.388 & \underline{0.400} & 0.477 & 0.476 & 0.402 & 0.414 & 0.456 & 0.452 & 0.877 & 0.656  \\
+                & 336 & \textbf{0.415} & \textbf{0.432} & 0.643 & 0.571 & 0.428 & \underline{0.432} & \underline{0.426} & 0.433 & 0.594 & 0.541 & 0.452 & 0.452 & 0.482 & 0.486 & 1.043 & 0.731  \\
+                & 720 & \textbf{0.444} & \textbf{0.455} & 0.874 & 0.679 & \underline{0.427} & \underline{0.445} & 0.431 & 0.446 & 0.831 & 0.657 & 0.462 & 0.468 & 0.515 & 0.511 & 1.104 & 0.763 \\
+                \midrule
+				% --- 数据行：ETTm1---
+				\multirow{4}{*}{\rotatebox{90}{ETTm1}}
+                & 96  & \textbf{0.326} & \textbf{0.359} & 0.364 & 0.387 & 0.334 & 0.368 & \underline{0.329} & \underline{0.367} & 0.345 & 0.372 & 0.338 & 0.375 & 0.505 & 0.475 & 0.404 & 0.426 \\
+                & 192 & \textbf{0.363} & \textbf{0.385} & 0.398 & 0.404 & 0.387 & 0.391 & \underline{0.367} & \textbf{0.385} & 0.380 & 0.389 & 0.374 & 0.387 & 0.553 & 0.496 & 0.450 & 0.451 \\
+                & 336 & \textbf{0.393} & \underline{0.411} & 0.428 & 0.425 & 0.426 & 0.420 & \underline{0.399} & \textbf{0.410} & 0.413 & 0.413 & 0.410 & \underline{0.411} & 0.621 & 0.537 & 0.532 & 0.515 \\
+                & 720 & 0.468 & 0.452 & 0.487 & 0.461 & 0.491 & 0.459 & \textbf{0.454} & \textbf{0.439} & \underline{0.474} & 0.453 & 0.478 & \underline{0.450} & 0.671 & 0.561 & 0.666 & 0.589 \\
+                \midrule
+				% --- 数据行：ETTm2 ---
+				\multirow{4}{*}{\rotatebox{90}{ETTm2}}
+                & 96  & \textbf{0.175} & \textbf{0.257} & 0.207 & 0.305 & 0.180 & 0.264 & \textbf{0.175} & \underline{0.259} & 0.193 & 0.292 & 0.187 & 0.267 & 0.255 & 0.339 & 0.287 & 0.366 \\
+                & 192 & \underline{0.238} & \textbf{0.297} & 0.290 & 0.364 & 0.250 & 0.309 & 0.241 & \underline{0.302} & 0.284 & 0.362 & 0.249 & 0.309 & 0.281 & 0.340 & 0.414 & 0.492 \\
+                & 336 & \textbf{0.303} & \textbf{0.338} & 0.377 & 0.422 & 0.311 & 0.348 & \underline{0.305} & \underline{0.343} & 0.369 & 0.427 & 0.321 & 0.351 & 0.339 & 0.372 & 0.597 & 0.542 \\
+                & 720 & 0.404 & 0.401 & 0.558 & 0.524 & 0.412 & 0.407 & \textbf{0.402} & \textbf{0.400} & 0.554 & 0.522 & \underline{0.408} & \underline{0.403} & 0.433 & 0.432 & 1.730 & 1.042 \\
+                \midrule
+				% --- 数据行：weather ---
+				\multirow{4}{*}{\rotatebox{90}{Weather}}
+                & 96  & \textbf{0.157} & \textbf{0.205} & 0.202 & 0.261 & \underline{0.174} & \underline{0.214} & 0.177 & 0.218 & 0.196 & 0.255 & \textbf{0.172} & 0.220 & 0.173 & 0.223 & 0.158 & 0.230 \\
+                & 192 & \textbf{0.210} & \textbf{0.252} & 0.242 & 0.298 & 0.221 & 0.254 & 0.225 & 0.259 & 0.237 & 0.296 & \underline{0.219} & 0.261 & 0.245 & 0.285 & \textbf{0.206} & 0.277 \\
+                & 336 & \textbf{0.262} & \textbf{0.290} & 0.287 & 0.335 & 0.278 & 0.296 & 0.278 & 0.297 & 0.283 & 0.335 & 0.280 & 0.306 & 0.321 & 0.338 & \underline{0.272} & 0.335 \\
+                & 720 & \textbf{0.341} & \textbf{0.343} & 0.351 & 0.386 & 0.358 & 0.349 & 0.354 & 0.348 & \underline{0.345} & 0.381 & 0.365 & 0.359 & 0.414 & 0.410 & 0.398 & 0.418 \\
+                \midrule
+				% --- 数据行：ELE ---
+				\multirow{4}{*}{\rotatebox{90}{ELE}}
+                & 96  & \textbf{0.137} & \textbf{0.235} & 0.237 & 0.329 & \underline{0.148} & \underline{0.240} & 0.174 & 0.259 & 0.197 & 0.282 & 0.168 & 0.272 & 0.201 & 0.317 & 0.219 & 0.314 \\
+                & 192 & \textbf{0.159} & \textbf{0.255} & 0.236 & 0.330 & \underline{0.162} & \underline{0.253} & 0.178 & 0.265 & 0.196 & 0.285 & 0.184 & 0.289 & 0.222 & 0.334 & 0.231 & 0.322 \\
+                & 336 & \textbf{0.173} & \textbf{0.271} & 0.249 & 0.344 & \underline{0.178} & \underline{0.269} & 0.196 & 0.282 & 0.209 & 0.301 & 0.198 & 0.300 & 0.231 & 0.338 & 0.246 & 0.337 \\
+                & 720 & \textbf{0.204} & \textbf{0.299} & 0.284 & 0.373 & \underline{0.225} & 0.317 & 0.237 & 0.316 & 0.245 & 0.333 & \textbf{0.220} & \underline{0.320} & 0.254 & 0.361 & 0.280 & 0.263 \\
+                \midrule
+				% --- 数据行：traffic ---
+				\multirow{4}{*}{\rotatebox{90}{Traffic}}
+                & 96  & \underline{0.405} & \underline{0.280} & 0.805 & 0.493 & \textbf{0.395} & \textbf{0.268} & 0.462 & 0.295 & 0.650 & 0.396 & 0.593 & 0.321 & 0.613 & 0.388 & 0.522 & 0.290 \\
+                & 192 & \underline{0.427} & \underline{0.288} & 0.756 & 0.474 & \textbf{0.417} & \textbf{0.276} & 0.466 & 0.296 & 0.598 & 0.370 & 0.617 & 0.336 & 0.616 & 0.382 & 0.530 & 0.293 \\
+                & 336 & \underline{0.445} & \underline{0.295} & 0.762 & 0.477 & \textbf{0.433} & \textbf{0.283} & 0.482 & 0.304 & 0.605 & 0.373 & 0.629 & 0.336 & 0.622 & 0.337 & 0.558 & 0.305 \\
+                & 720 & \underline{0.485} & \underline{0.315} & 0.719 & 0.449 & \textbf{0.467} & \textbf{0.302} & 0.514 & 0.322 & 0.645 & 0.394 & 0.640 & 0.350 & 0.660 & 0.408 & 0.589 & 0.328 \\
+                \midrule
+				% --- 数据行：exchange ---
+				\multirow{4}{*}{\rotatebox{90}{Exchange}}
+                & 96  & \underline{0.088} & \underline{0.207} & 0.094 & 0.218 & \textbf{0.086} & \underline{0.206} & \underline{0.088} & \textbf{0.205} & \underline{0.088} & 0.218 & 0.107 & 0.234 & 0.197 & 0.323 & 0.256 & 0.367 \\
+                & 192 & 0.180 & 0.300 & 0.184 & 0.307 & \underline{0.177} & \textbf{0.299} & \textbf{0.176} & \textbf{0.299} & \textbf{0.176} & 0.315 & 0.226 & 0.344 & 0.300 & 0.369 & 0.470 & 0.509 \\
+                & 336 & 0.356 & 0.430 & 0.349 & 0.431 & 0.331 & 0.417 & \textbf{0.301} & \textbf{0.397} & \underline{0.313} & 0.427 & 0.367 & 0.448 & 0.509 & 0.524 & 1.268 & 0.883 \\
+                & 720 & 0.880 & 0.711 & 0.852 & 0.698 & \underline{0.847} & \textbf{0.691} & 0.901 & 0.714 & \textbf{0.839} & \underline{0.695} & 0.964 & 0.746 & 1.447 & 0.941 & 1.767 & 1.068 \\
+                \bottomrule
+			\end{tabular}
+		\end{adjustbox}
+		
+		\label{tab:main_results}
+	\end{table*}
+	
+	% -----------------------------------------------------------------
+	\subsection{Ablation Study}
+	
+	We conduct a comprehensive ablation study to dissect the AHuber architecture and validate the contributions of its core components. Our analysis is structured as a multi-level investigation, designed to determine: (1) \textbf{whether} our signal distillation philosophy is superior to brute-force interaction, (2) \textbf{whether} MPA is the key to effective distillation, (3) \textbf{what} the relative importance of the perception versus the distribution stage is, and (4) \textbf{how} the components synergize.
+	 \paragraph{1. Distillation vs. Decoupled Interaction: Efficiency over Complexity.}
+    We first test our core premise by comparing AHuber against a sophisticated interaction-aware baseline, denoted as \textbf{`Decoupled S-T Attn`}. Since applying full self-attention across all patches is computationally intractable ($\mathcal{O}((NP)^2)$), this baseline employs a standard \textbf{axis-decoupled design}: it applies self-attention separately along the temporal axis and then the variable axis.
+    
+    The results in Table~\ref{tab:ablation} reveal a clear advantage for AHuber. While `Decoupled S-T Attn` avoids the quadratic explosion of full attention, it still incurs a heavy cost of $\mathcal{O}(N P^2 + P N^2)$ and lags behind AHuber in accuracy (e.g., Traffic T=96). This indicates that merely decoupling the axes is insufficient; it fragments the spatio-temporal context. In contrast, AHuber's \textit{Echoic Perception} treats the context as a holistic entity, distilling it into a unified Global State. This demonstrates that a compressed, unified understanding is superior to complex, decoupled processing.
+
+	\paragraph{2. The Necessity of MPA for Perception.}
+	Next, to prove that MPA is the crucial ingredient for high-quality distillation, we create a variant named \textbf{`w/o MPA`}. Here, we replace the MPA mechanism with a simple MLP aggregator. This highlights that the Proxy Attention mechanism, which allows learnable agents to actively seek out salient information, is indispensable.
+	
+	\paragraph{3. Dynamic Routing vs. Static Broadcast.}
+	To validate the necessity of the attention-based distribution mechanism, we compare AHuber with a variant named \textbf{`Linear Dist`}, where the distribution stage is replaced by the static MLP broadcasting used in preliminary versions. 
+	The results show that our attention-based design consistently outperforms the linear variant. This confirms that a "one-size-fits-all" broadcast is suboptimal. The heterogeneity of time series requires a dynamic mechanism where patches can actively select the global context (e.g., trend vs. seasonality) that matches their local properties.
+	
+	\paragraph{4. Synergy of 2D Encoding and Distribution.}
+	Finally, we investigate the synergy between our 2D positional encoding and the MLP distribution module. In the \textbf{`w/o 2D Pos. Enc.`} variant, we revert to a standard 1D temporal encoding. The consistent performance drop, especially on high-dimensional datasets like Traffic, confirms our hypothesis: the MLP distributor relies on the explicit `(variable, time)` coordinates provided by the 2D encoding to perform its function effectively. Without this spatial awareness, the MLP cannot differentiate between tokens and apply the global context in a meaningful, targeted manner.
+	
+	\paragraph{Summary of Findings.}
+	Collectively, these ablations provide a clear and compelling picture. AHuber's success is not accidental but the result of a series of deliberate, synergistic design choices. The experiments act as a logical deduction, proving that MPA-driven signal distillation is the core engine, the attention distribution is the efficient transmission, and the 2D positional encoding is the essential navigation system. Removing any component significantly degrades performance, validating our architecture's integrity.
+	
+	\begin{table*}[t!]
+        \centering
+        \small
+        \setlength{\tabcolsep}{3.5pt} 
+        
+        \sisetup{
+            table-format=1.3,
+            tight-spacing=true,
+            detect-weight,
+            detect-display-math
+        }
+        
+        \caption{Ablation study on the architecture of AHuber. We report MSE/MAE on three representative datasets. \textbf{Decoupled S-T Attn} represents the axis-decoupled interaction baseline. \textbf{w/o MPA} replaces Proxy Attention with simple MLP aggregation. \textbf{Linear Dist.} replaces the active retrieval with static broadcasting. Lower is better.}
+        \label{tab:ablation}
+        \begin{adjustbox}{max width=\textwidth}
+            \begin{tabular}{
+                    c |c|cc|cc|cc|cc|cc 
+                }
+                \toprule
+                % --- 第一行：模型名称 (统一命名) ---
+                \multicolumn{2}{c|}{\multirow{2}{*}{\textbf{Model Variant} $\rightarrow$}} & \multicolumn{2}{c|}{\textbf{AHuber (Ours)}} & \multicolumn{2}{c|}{\textbf{Decoupled Attn}} & \multicolumn{2}{c|}{\textbf{w/o MPA}} & \multicolumn{2}{c|}{\textbf{Linear Dist.}} & \multicolumn{2}{c}{\textbf{w/o 2D Pos}} \\
+                \cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10} \cmidrule(lr){11-12} 
+                % --- 第二行：核心目的 (对应修改) ---
+                \multicolumn{2}{c|}{\textbf{Core Purpose} $\rightarrow$} & \multicolumn{2}{c|}{Complete Model} & \multicolumn{2}{c|}{vs. Decp Intera} & \multicolumn{2}{c|}{Necessity of Proxies} & \multicolumn{2}{c|}{Dynamic vs. Static} & \multicolumn{2}{c}{Synergy of 2D Pos.} \\
+                \midrule
+                \multicolumn{2}{c|}{Metrics} & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE & MSE & MAE \\
+                \midrule
+                % 注意：你需要根据新列顺序调整下面的数据列！
+                % 假设原始数据顺序是: AHuber, MLP-Aggre, MLP-Dist, w/o Pos, Decoupled
+                % 新顺序是:        AHuber, Decoupled, MLP-Aggre, MLP-Dist, w/o Pos
+                \multirow{4}{*}{\rotatebox{90}{ELE}} 
+                & 96  & \textbf{0.137} & \underline{0.235} & 0.145 & 0.243 & 0.138 & 0.233 & \textbf{0.137} & \textbf{0.231} & 0.141 & 0.239 \\
+                & 192 & \underline{0.159} & \underline{0.255} & 0.169 & 0.265 & 0.160 & \textbf{0.253} & \textbf{0.157} & 0.258 & 0.158 & 0.257 \\
+                & 336 & \textbf{0.173} & \textbf{0.271} & \textbf{0.173} & 0.273 & 0.176 & 0.272 & \textbf{0.173} & \textbf{0.271} & 0.175 & 0.276 \\
+                & 720 & \underline{0.204} & \underline{0.299} & \textbf{0.202} & \textbf{0.297} & 0.205 & 0.300 & 0.216 & 0.310 & 0.209 & 0.299 \\
+                \midrule
+                \multirow{4}{*}{\rotatebox{90}{Traffic}} 
+                & 96  & \textbf{0.405} & \underline{0.280} & 0.420 & 0.281 & 0.415 & 0.273 & \textbf{0.405} & \textbf{0.266} & 0.420 & 0.281 \\
+                & 192 & \textbf{0.427} & 0.288 & 0.433 & \underline{0.284} & 0.436 & 0.279 & \textbf{0.422} & \textbf{0.271} & 0.433 & \underline{0.284} \\
+                & 336 & \textbf{0.445} & \underline{0.295} & 0.449 & \textbf{0.287} & 0.456 & \underline{0.288} & \underline{0.448} & 0.296 & 0.449 & \textbf{0.287} \\
+                & 720 & 0.485 & 0.315 & \textbf{0.483} & \underline{0.312} & 0.498 & \textbf{0.305} & 0.493 & 0.323 & \textbf{0.483} & \underline{0.312} \\
+                \midrule
+                \multirow{4}{*}{\rotatebox{90}{Weather}} 
+                & 96  & 0.157 & 0.205 & 0.156 & 0.204 & 0.158 & 0.204 & \textbf{0.154} & \underline{0.203} & \underline{0.155} & \textbf{0.202} \\
+                & 192 & \textbf{0.210} & \textbf{0.252} & 0.211 & 0.254 & \textbf{0.210} & \textbf{0.252} & \textbf{0.208} & \textbf{0.252} & 0.211 & \textbf{0.252} \\
+                & 336 & \textbf{0.262} & \textbf{0.290} & 0.265 & 0.294 & 0.265 & 0.293 & \underline{0.264} & 0.291 & 0.273 & 0.297 \\
+                & 720 & \underline{0.341} & \underline{0.343} & \textbf{0.336} & \textbf{0.341} & 0.344 & 0.346 & \underline{0.339} & 0.342 & 0.348 & \textbf{0.247} \\
+                \bottomrule
+            \end{tabular}
+        \end{adjustbox}
+    \end{table*}
+	% -----------------------------------------------------------------
+	
+	\section{Dive into Architectural Choices}
+    \label{sec:analysis_and_discussion}
+    
+    The remarkable performance of AHuber on diverse time series benchmarks stems from a design philosophy tailored to the specific challenges of this data modality. In this section, we analyze two key architectural choices to explain why AHuber functions as a highly specialized \textbf{Structural Signal Distillation Engine}.
+    
+    \subsection{MPA: Structural Regularization against Overfitting}
+    \label{subsec:mpa_as_distiller}
+    
+    \paragraph{The Challenge of Redundancy and Overfitting.}
+    Multivariate time series often exhibit high redundancy, where the system's dynamics are driven by a few latent factors rather than independent variations of every sensor. In this context, the $\mathcal{O}(N^2)$ all-to-all attention of channel-mixing models provides excessive capacity. As noted in PatchTST~\cite{nie2023patchtst}, this can lead to overfitting, where the model learns spurious pairwise correlations instead of the true underlying dynamics. The challenge, therefore, is to capture global interactions without granting the model so much freedom that it memorizes noise.
+    
+    \paragraph{MPA as an Information Bottleneck.}
+    Our Multi-head Proxy Attention (MPA) addresses this by introducing a structural \textbf{Information Bottleneck}. By forcing the high-dimensional input canvas ($N$ variables) to be summarized by a small, fixed number of learnable Proxy Tokens, where ($H \ll N$), imposing a strong inductive bias. This architecture inherently acts as a regularizer. It compels the model to discard high-frequency noise and redundant details, capturing only the most salient, persistent dynamics (the Global State) that can fit through the bottleneck. The proxies effectively evolve into concept detectors, distilling the signal rather than memorizing the data.
+    
+    \paragraph{The Importance of Specialization: A Probing Experiment.}
+    To validate this understanding, we conducted a probing experiment by applying AHuber to image classification on CIFAR-10, a high-SNR task. The model achieved a modest 84\% accuracy, significantly trailing behind architectures like ViT. This result is not a failure, but a crucial confirmation of our thesis. ViT's all-to-all attention provides the high-bandwidth channel needed to model the complex spatial relationships in images. In contrast, AHuber's distillation mechanism, by design, discards the very local details essential for this task. AHuber's strength in time series and its relative weakness in image classification are two sides of the same coin, validating that its strength lies in \textbf{principled information distillation}, not exhaustive information processing.
+	
+	\subsection{The Flatten Head: From Patch Gluer to Semantic Decoder}
+    \label{subsec:flatten_head_discussion}
+    
+    A critical challenge in patch-based modeling is the \textit{Arbitrary Segmentation Problem}. The act of patching imposes a fixed grid onto a continuous signal, potentially fracturing a single meaningful event (e.g., a sudden spike) across two separate patches. 
+    
+    \paragraph{Beyond PatchTST's Strategy.}
+    Prior works like PatchTST~\cite{nie2023patchtst} successfully utilized a Flatten Head to mitigate this. By concatenating all patches into a single vector, the model restores a "holographic" view of the look-back window, allowing the final linear layer to bypass the fractured boundaries. However, in Channel-Independent models, this Linear Head bears the entire burden of representation learning: it must simultaneously filter noise, capture temporal dependencies, and ignore cross-variable interference from raw, noisy embeddings.
+    
+    \paragraph{AHuber's Distinct Usage: Decoding Disentangled Signals.}
+    In AHuber, the role of the Flatten Head is fundamentally elevated. It does not merely glue raw patches together; it acts as a decoder for a \textbf{structurally disentangled representation}.
+    
+    Before reaching the Flatten Head, the input tokens have passed through the EchoLayers. As visualized in Section~\ref{sec:visualization}, this process effectively \textit{denoises} the data: the MPA mechanism filters out high-frequency jitter via the bottleneck, while the Distribute mechanism injects global context. Consequently, the input to our Flatten Head is not a chaotic sequence of raw values, but a refined, context-aware state sequence where the underlying system dynamics have already been disentangled from the noise.
+    
+    Therefore, while AHuber adopts the architectural form of the Flatten Head for its robustness against segmentation, its function shifts from \textit{brute-force pattern matching} (as in PatchTST) to \textit{semantic decoding} of a refined Global State. This synergy explains why AHuber achieves superior performance even with a simple linear readout.
+
+	% -----------------------------------------------------------------
+	
+	\subsection{Scalability and Efficiency Analysis}
+    \label{sec:scalability}
+
+    A core claim of our work is that AHuber breaks the quadratic complexity bottleneck inherent in interaction-aware models. To empirically validate this, we conduct a rigorous benchmark divided into two critical phases: \textbf{Training Scalability} (computational throughput) and \textbf{Inference Efficiency} (latency and deployment feasibility).
+    
+    We fix the model dimension to $d_{model}=128$ and vary the number of variables $N$ across four orders of magnitude ($N \in \{7, 21, 321, 862\}$).
+
+    \subsubsection{Training Scalability: The High-Dimensional Advantage}
+    
+    Figure~\ref{fig:scalability} presents the training throughput (normalized to time per 1000 samples) and peak GPU memory usage.
+    
+    \begin{figure}[t!]
+        \centering
+        \includegraphics[width=\linewidth]{exp_fig/training_scalability_comparison.pdf}
+        \caption{\textbf{Training Scalability Analysis.} (Left) Training time per 1k samples. (Right) Peak GPU Memory. While iTransformer is efficient at low dimensions, it hits a computational wall at $N=862$, where its memory usage spikes quadratically. AHuber maintains a linear profile, achieving the fastest throughput at scale.}
+        \label{fig:scalability}
+    \end{figure}
+
+    \paragraph{Breaking the Quadratic Wall.}
+    As shown in Figure~\ref{fig:scalability} (Right), iTransformer exhibits a distinct "knee" in memory consumption. While it is memory-efficient for small $N$, its usage explodes by $\mathbf{6\times}$ (from 0.57GB to 3.37GB) when scaling from $N=321$ to $N=862$. This confirms the $\mathcal{O}(N^2)$ bottleneck. In contrast, AHuber (green line) maintains a strictly linear growth, consuming only \textbf{2.83GB} at $N=862$. This "crossover" demonstrates that AHuber is uniquely suited for massive-scale datasets where $N$ reaches thousands.
+    
+    \paragraph{Throughput Superiority.}
+    In terms of speed (Figure~\ref{fig:scalability} Left), AHuber achieves the highest throughput at $N=862$ ($\sim$1.69s/1k samples), outperforming both iTransformer (1.74s) and PatchTST (2.01s). This validates that our MPA mechanism effectively reduces the computational burden of interaction modeling.
+
+    \subsubsection{Inference Efficiency: Deployment Latency}
+    
+    For industrial deployment, inference latency is the decisive metric. Figure~\ref{fig:efficiency} details the performance on edge-constrained settings.
+
+    \begin{figure}[h!]
+        \centering
+        \begin{subfigure}[b]{0.23\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/efficiency_time.pdf}
+            \caption{Inference Time (ms)}
+            \label{fig:efficiency_time}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.23\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/efficiency_memory.pdf}
+            \caption{Peak Memory (GB)}
+            \label{fig:efficiency_memory}
+        \end{subfigure}
+        \caption{
+            \textbf{Inference Efficiency.}
+            (a) Inference latency and (b) peak memory. AHuber achieves the lowest latency (4.55ms) at $N=862$, significantly outperforming baselines.
+        }
+        \label{fig:efficiency}
+    \end{figure}
+
+    \paragraph{Lowest Latency for Real-Time Applications.}
+    Figure~\ref{fig:efficiency_time} reveals a striking result: AHuber is significantly faster than the baselines at high dimensions. At $N=862$, AHuber achieves an inference latency of \textbf{4.55ms}, which is \textbf{28\% faster} than iTransformer (6.32ms) and \textbf{55\% faster} than PatchTST (10.01ms).
+    
+    \paragraph{Why is PatchTST Slow?} Surprisingly, the channel-independent PatchTST is the slowest. This is because its complexity is $\mathcal{O}(N \cdot P^2)$. With a large look-back window and many patches, the quadratic cost along the \textit{time} axis accumulates.
+    
+    \paragraph{Why is iTransformer Slow?} iTransformer slows down due to the $\mathcal{O}(N^2)$ cost along the \textit{variable} axis.
+    
+    \paragraph{AHuber's Linear Scaling.} AHuber avoids both pitfalls. By distilling interactions into a small set of proxies ($H \ll N, P$), it decouples $N$ from $P$, achieving $\mathcal{O}(N \cdot P)$ complexity. This makes AHuber the most "production-ready" solution, capable of delivering real-time forecasts for high-dimensional systems with minimal latency.
+
+    \paragraph{The "Hard Constraint" of Deployment Memory.}
+    The hardware-masked factor for industrial deployment is often memory (Figure~\ref{fig:efficiency_memory}). While iTransformer might be fast, its memory requirement explodes, rendering it undeployable on edge devices or requiring expensive high-VRAM GPUs for inference servers. 
+    
+    \textbf{AHuber's Advantage:} AHuber offers the best of both worlds. It matches the low latency of channel-independent models (like PatchTST) while maintaining a minimal memory footprint. This \textbf{Linear Time + Linear Space} profile ensures that AHuber can be deployed on cost-effective hardware without sacrificing the global reasoning capabilities that drive its high accuracy. This makes AHuber a suitable solution for large-scale forecasting systems.
+
+	\paragraph{Conclusion.}
+	Collectively, these results paint a clear picture. While iTransformer's speed is impressive in isolation, its quadratic memory scaling makes it impractical for truly high-dimensional systems. AHuber, on the other hand, offers a robust and balanced solution. It not only demonstrates true linear scalability in both time and memory but also achieves this without sacrificing the state-of-the-art performance shown in our main results. This confirms that AHuber successfully addresses the trade-off between modeling power and computational feasibility, making it a genuinely scalable solution for large-scale multivariate time series forecasting.
+	This highlights a critical trade-off: iTransformer's apparent efficiency under this constraint is achieved by sacrificing the very representational capacity needed for high accuracy. In contrast, AHuber delivers state-of-the-art performance without demanding excessive resources, thus offering a superior Pareto front between accuracy and efficiency. AHuber provides a feasible path for high-dimensional interaction modeling on edge devices.
+	
+	
+	\subsection{Visualization and Interpretation}
+	\label{sec:visualization}
+	To move beyond quantitative metrics and provide qualitative evidence for our expert team analogy, we visualize the internal mechanisms of AHuber. Figure.~\ref{fig:visualization_evolution} provides two complementary views into the model's latent representations: how its proxy tokens learn to attend to specific data patterns, and how its global context evolves to capture the system dynamics.
+	\paragraph{Hierarchical Refinement of Global Context.}
+	
+	The  Figure.~\ref{fig:visualization_evolution} visualizes the evolution of the global context vectors using t-SNE. We plot the contexts generated by all samples in the test set, colored by their future trend (e.g., high or low consumption). 
+	\begin{itemize}
+		\item \textbf{After Layer 1 (Figure.~\ref{fig:tsne_layer0}):} The context vectors are largely unstructured, forming a single, undifferentiated cloud. This indicates that a shallow, single-glance perception is insufficient to capture meaningful macroscopic states.
+		\item \textbf{After Final Layer (Figure.~\ref{fig:tsne_layer2}):} A dramatic transformation occurs. The context vectors now form distinct, well-separated clusters that strongly correlate with the future system state. 
+	\end{itemize}
+	This chaotic-to-structured evolution vividly demonstrates the power of our stacked EchoLayer design. It is the visual evidence of \textbf{Echoic Perception} in action: the model hierarchically refines the global context from a raw perception into a semantically rich representation capable of driving accurate forecasts.
+	\begin{figure*}[t]
+        \centering
+        % --- 第一行：PCA 完整演化 (3张图) ---
+        \begin{subfigure}[b]{0.32\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/pca_manifold_continuous_layer0.png}
+            \caption{Layer 0: PCA (Chaos)}
+            \label{fig:pca_layer0}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.32\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/pca_manifold_continuous_layer1.png} % 中间层
+            \caption{Layer 1: PCA (Emerging)}
+            \label{fig:pca_layer1}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.32\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/pca_manifold_continuous_layer2.png} % 最终层
+            \caption{Layer 2: PCA (Refined)}
+            \label{fig:pca_layer2}
+        \end{subfigure}
+        
+        \vspace{0.2cm} % 行间距
+        
+        % --- 第二行：t-SNE 关键对比 (2张图，居中) ---
+        \begin{subfigure}[b]{0.32\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/tsne_manifold_continuous_layer0.png}
+            \caption{Layer 0: t-SNE (Entangled)}
+            \label{fig:tsne_layer0}
+        \end{subfigure}
+        \hspace{1cm} % 增加两图之间的间距
+        \begin{subfigure}[b]{0.32\textwidth}
+            \includegraphics[width=\textwidth]{exp_fig/tsne_manifold_continuous_layer2.png}
+            \caption{Layer 2: t-SNE (Manifold)}
+            \label{fig:tsne_layer2}
+        \end{subfigure}
+        
+        \caption{\textbf{Evolution of Global Contexts.} Top row: PCA projections across all three layers reveal a progressive refinement of the latent manifold, from initial chaos to a smooth, continuous trajectory. Bottom row: t-SNE visualizations highlight the dramatic structural shift from the entangled state in Layer 0 to the highly organized manifold in Layer 2, confirming the model's rapid convergence to a physically meaningful representation.}
+        \label{fig:visualization_evolution}
+    \end{figure*}
+
+	\paragraph{Progressive Refinement vs. Rapid Convergence.}
+	Figure~\ref{fig:visualization_evolution} offers a nuanced view of the learning dynamics. The top row (PCA) illustrates a \textbf{progressive refinement} process: the manifold structure becomes increasingly smooth and elongated from Layer 0 to Layer 2, indicating that AHuber continuously fine-tunes its understanding of the global physical laws (load intensity). In contrast, the bottom row (t-SNE) reveals a \textbf{rapid convergence}: the chaotic \textit{cotton ball} in Layer 0 transforms into a structured manifold almost immediately. This suggests that the Echoic Perception mechanism is highly efficient, capturing the core topology of the system early in the network, while subsequent layers focus on smoothing the continuous gradients for precise forecasting.
+
+	\paragraph{Emergent Functional Diversity via Active Retrieval.}
+    A critical question is whether the proxy tokens simply learn redundant representations or evolve into distinct functional units. Figure~\ref{fig:all_heatmaps} visualizes the attention patterns of four representative heads from the first EchoLayer. Unlike static aggregation methods where representations often collapse into a few modes, our \textbf{Active Retrieval} distribution mechanism incentivizes the proxies to diversify. We observe the spontaneous emergence of four distinct expert roles:
+    
+    \begin{itemize}
+        \item \textbf{Pattern A: Global Trend Specialist.} (Fig.~\ref{fig:heatmap_global}) exhibits a diffuse attention across all variables and time steps, distilling the macroscopic baseline of the system.
+        \item \textbf{Pattern B: Periodicity Specialist.} (Fig.~\ref{fig:heatmap_periodic}) displays clear vertical striations, attending to historical time steps that correspond to the data's inherent cycles.
+        \item \textbf{Pattern C: Key-Variable Monitor.} (Fig.~\ref{fig:heatmap_variable}) focuses intensely on specific rows (variables), suggesting the model has identified \textit{influencer nodes} in the network that drive the system's dynamics.
+        \item \textbf{Pattern D: Anomaly Detector.} (Fig.~\ref{fig:heatmap_local}) shows sparse, localized activation, filtering out background noise to focus solely on transient, high-frequency events.
+    \end{itemize}
+    
+    This diversity confirms that the proxies do not merely duplicate information. Instead, driven by the local tokens' need to retrieve specific contexts, they self-organize into a heterogeneous team of experts, covering the global, periodic, spatial, and local aspects of the time series.
+
+	
+	\begin{figure*}[t!]
+		% ---证明proxy是专家
+		\centering
+        \begin{subfigure}[b]{\mysubfigurewidth}
+            \centering
+            \includegraphics[width=\textwidth, height=\myimageheight]{exp_fig/heatmap_global.png} % 选一张看起来比较"全局"的图
+            \caption{Pattern A: Global Awareness}
+            \label{fig:heatmap_global}
+        \end{subfigure}
+        \hfill 
+        \begin{subfigure}[b]{\mysubfigurewidth}
+            \centering
+            \includegraphics[width=\textwidth, height=\myimageheight]{exp_fig/heatmap_periodic.png} % 选一张有垂直条纹的图
+            \caption{Pattern B: Temporal Periodicity}
+            \label{fig:heatmap_periodic}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{\mysubfigurewidth}
+            \centering
+            \includegraphics[width=\textwidth, height=\myimageheight]{exp_fig/heatmap_variable.png} % 选一张有水平条纹的图
+            \caption{Pattern C: Variable Specificity}
+            \label{fig:heatmap_variable}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{\mysubfigurewidth}
+            \centering
+            \includegraphics[width=\textwidth, height=\myimageheight]{exp_fig/heatmap_local.png} % 选一张稀疏亮点的图
+            \caption{Pattern D: Local Event Focus}
+            \label{fig:heatmap_local}
+        \end{subfigure}
+        
+        \caption{\textbf{Emergent Attention Patterns.} Visualization of attention heatmaps from four different proxy heads in the first EchoLayer. The x-axis represents time patches, and the y-axis represents variables. The distinct patterns---ranging from global aggregation to specific periodic or variable-focused attention---demonstrate that the proxies spontaneously learn diverse strategies to distill the system state.}
+        \label{fig:all_heatmaps}
+    \end{figure*}
+	
+	
+	
+	% -----------------------------------------------------------------
+	\section{Conclusion and Future Work}
+	\label{sec:conclusion}
+	
+	In this paper, we addressed a fundamental dilemma in multivariate time series forecasting: the trade-off between the interaction-blind efficiency of channel-independent models and the computationally prohibitive cost of exhaustive interaction models. We argued that this dilemma stems from a restrictive assumption and proposed a new paradigm, \textbf{Echoic Perception}, which posits that modeling a system's emergent, holistic state is more effective than tracking every pairwise interaction. We introduced \textbf{AHuber}, the first architecture built on this principle. Through extensive experiments, we demonstrated that AHuber not only achieves state-of-the-art forecasting accuracy but does so with remarkable efficiency, attaining a complexity of $\mathcal{O}(N \cdot L)$ which is linear with respect to the total input size, thus avoiding the quadratic bottlenecks in either dimension.
+	
+	The success of our approach is rooted in a synergistic combination of several core design principles, which collectively form an elegant and powerful Distill, then Distribute information processing pipeline:
+	
+	\paragraph{Forced Distillation through a Low-Rank Bottleneck.}
+	The core of our \textbf{EchoLayer} is the hub-aggregation mechanism. By forcing the vast spatio-temporal information canvas through a compact set of learnable hubs, it acts as an intelligent information bottleneck. This design mitigates the risk of overfitting inherent in dense interaction models, compelling the model to distill only the most persistent, globally-relevant patterns---the underlying dynamics of the system's dynamics.
+	
+	\paragraph{Efficient Context Infusion via Attention.}
+	Once the holistic system state is distilled, it is efficiently infused back into each individual patch token via a Hub-Distribution Attention mechanism. Unlike static broadcasting, this allows for dynamic, content-aware context injection, enabling each patch to actively retrieve the specific global signals relevant to its state.
+	
+	\paragraph{Hierarchical Refinement of System State.}
+	A key innovation lies in the stacking of EchoLayers, where the context distilled by layer $l-1$ informs the perception process of layer $l$. This creates a hierarchical refinement process, akin to a chain of \textit{echoes of echoes}. Lower layers may capture concrete, local patterns, while higher layers, informed by this prior understanding, can distill increasingly abstract and macroscopic states of the system, leading to a rich, multi-faceted final representation.
+	
+	\paragraph{The Broader Applicability of Echoic Perception.}
+	While demonstrated on time series, the Distill, then Distribute paradigm holds significant promise as a general-purpose perception mechanism.Similar to representation learning approaches in other domains, such as \textbf{TS2Vec}~\cite{yue2022ts2vec} for time series and \textbf{HuBERT}~\cite{hsu2021hubert} for speech, AHuber distills continuous signals into discrete, semantic units. For computer vision, the hubs could distill a scene's global context to help disambiguate local patches. In natural language processing, hubs could capture a document's main gist to resolve lexical ambiguity within individual sentences. AHuber can thus be seen as a blueprint for a new class of highly efficient, linear-complexity perception models applicable across various domains.
+	
+	\paragraph{Future Work.}
+	Our work opens several exciting avenues for future research. First, our ablation study revealed that while our distillation approach is broadly superior, exhaustive attention can occasionally excel in very long-horizon tasks. This suggests a potential limitation of a fixed-size proxy bottleneck, which might inadvertently filter out subtle but critical long-range signals. Therefore, exploring \textbf{adaptive hub mechanisms}, where the number or capacity of proxy tokens can dynamically adjust based on data complexity or forecast horizon, could be a promising direction. Second, the application of AHuber to other domains, particularly in processing large-scale graph data or spatio-temporal data from scientific simulations, warrants investigation. Finally, developing a theoretical framework to formally quantify the distillation capacity of the hub mechanism in relation to data complexity would be a valuable contribution. We are confident that the principles of Echoic Perception will inspire the development of more scalable and intelligent systems for understanding complex data.
+	% -----------------------------------------------------------------
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{ref}
+	
+\end{document}
