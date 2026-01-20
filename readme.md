@@ -6,7 +6,7 @@
 
 **AHuber** is a Transformer Based framework that introduces the paradigm of **Centralized Information** for multivariate time series forecasting. It breaks the quadratic computational bottleneck of existing interaction-aware models, achieving **Linear Complexity $\mathcal{O}(N \cdot L)$** while capturing robust global dependencies.
 
-**Core Philosophy:** Robust system modeling does not require tracking every pairwise interaction ($\mathcal{O}(N^2)$). Instead, AHuber **distills** core dynamics into a compact Global Hub and **distributes** refined context back to local variables, effectively decoupling the **System State** from **Local Details**.
+**Core Philosophy:** Robust system modeling does not require tracking every pairwise interaction $\mathcal{O}(N^2)$. Instead, AHuber **distills** core dynamics into a compact Global Hub and **distributes** refined context back to local variables, effectively decoupling the **System State** from **Local Details**.
 
 ## 🚀 The Dilemma & Our Solution
 
