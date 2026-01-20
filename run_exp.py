@@ -82,6 +82,9 @@ if __name__ == '__main__':
     parser.add_argument('--fc_dropout', type=float, default=0.1, help='fully connected layer dropout')
     parser.add_argument('--padding_patch', type=str, default=None)
     parser.add_argument('--head_dropout', type=float, default=0, help='head Dropout')
+    # SOFTS
+    parser.add_argument('--d_core', type=int, default=128, help='STAR dimension')
+    
     args = parser.parse_args()
 
     # === Auto-configure params based on dataset ===
