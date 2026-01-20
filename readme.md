@@ -15,7 +15,7 @@ In Multivariate Time Series Forecasting (MTSF), existing models face a fundament
 *   **Simplified Efficiency:** Previous efficient architectures often rely on simple statistical aggregation or linear decomposition. While fast, this limits their capacity to explicitly model deep, evolving system dynamics and long-range dependencies across variables.
 
 
-**AHuber solves this by introducing an Attention-based "Dual-Pathway Mechanism":**
+**AHuber solves this by introducing an Attention-based Dual-Pathway Mechanism:**
 
 
 AHuber avoids all-to-all attention by using a learnable **Global Hub** vector. It employs a State-Detail Decoupling strategy:
