@@ -130,15 +130,13 @@ if __name__ == '__main__':
     Exp = Exp_Main
 
     # === Optimization: Define setting string once ===
-    setting = '{}_{}_{}_ft{}_sl{}_pd{}_pl{}_sd{}_dm{}_nh{}_el{}_df{}_lr{}_dp{}'.format(
+    setting = '{}_{}_{}_ft{}_sl{}_pd{}_dm{}_nh{}_el{}_df{}_lr{}_dp{}'.format(
         args.model_id,
         args.model,
         args.data,
         args.features,
         args.seq_len,
         args.pred_len,
-        args.patch_len,
-        args.stride,
         args.d_model,
         args.n_heads,
         args.e_layers,

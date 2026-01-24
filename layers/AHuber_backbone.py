@@ -62,9 +62,9 @@ class Backbone(nn.Module):
         """
         super().__init__()
   
-        # 1. Encoder: Seq -> Token
+        # 1. Projector: Seq -> Token
 
-        self.encoder = nn.Sequential(
+        self.Projector = nn.Sequential(
             nn.Linear(seq_len, d_model),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -76,9 +76,8 @@ class Backbone(nn.Module):
         # 3. Distribution: Hub -> Vars
         self.attn_dist = nn.MultiheadAttention(embed_dim=d_model, num_heads=n_heads, batch_first=True)
         
-        # 4. Decoder: Token -> Seq
-
-        self.decoder = nn.Sequential(
+        # 4. Reconstructor: Token -> Seq
+        self.Reconstructor = nn.Sequential(
             nn.Linear(d_model, d_ff),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -90,8 +89,8 @@ class Backbone(nn.Module):
 
     def forward(self, x_in, pre_hub_context):
 
-        # === Step 1: Encoder ===
-        var_tokens = self.encoder(x_in)
+        # === Step 1: Projector ===
+        var_tokens = self.Projector(x_in)
         
         # === Step 2: Aggregation ===
         # Aggregation: Hub (Query) <- Vars (Key/Value)
@@ -104,11 +103,11 @@ class Backbone(nn.Module):
         # === Step 3: Distribution ===
         var_refined, _ = self.attn_dist(query=var_tokens, key=next_hub_context,value=next_hub_context)
         
-        dec_in = self.norm_attn(var_tokens + self.dropout(var_refined))
+        rec_in = self.norm_attn(var_tokens + self.dropout(var_refined))
         
-        # === Step 4: Decode & Output ===
-        dec_out = self.decoder(dec_in)
-        # x_out = x_in + dec_out
-        x_out = x_in + self.dropout(dec_out)
+        # === Step 4: Reconstruct & Output ===
+        rec_out = self.Reconstructor(rec_in)
+        # x_out = x_in + rec_out
+        x_out = x_in + self.dropout(rec_out)
         
         return x_out, next_hub_context

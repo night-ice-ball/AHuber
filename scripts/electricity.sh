@@ -14,7 +14,7 @@ do
     model_id="${model_id_name}_${seq_len}_${pred_len}"
     log_file="logs/${model_name}_${data_name}_${seq_len}_${pred_len}.log"
 
-    python -u gogogo.py \
+    python -u run_exp.py \
       --random_seed "${random_seed}" \
       --is_training 1 \
       --model_id "${model_id}" \
@@ -25,17 +25,17 @@ do
       --features M \
       --seq_len "${seq_len}" \
       --pred_len "${pred_len}" \
-      --e_layers 3 \
-      --n_heads 8 \
-      --d_model 256 \
-      --d_ff 512 \
+      --e_layers 4 \
+      --n_heads 12 \
+      --d_model 192 \
+      --d_ff 384 \
       --dropout 0.2 \
       --head_dropout 0 \
       --d_hub 1 \
-      --train_epochs 20 \
+      --train_epochs 30 \
       --itr 1 \
       --batch_size 64 \
-      --learning_rate 0.001 \
+      --learning_rate 0.0005 \
       > "${log_file}" 2>&1
 
     echo "Finished run: ${model_id}, log -> ${log_file}"

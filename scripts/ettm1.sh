@@ -14,7 +14,7 @@ do
     model_id="${model_id_name}_${seq_len}_${pred_len}"
     log_file="logs/${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
 
-    python -u gogogo.py \
+    python -u run_exp.py \
       --random_seed "${random_seed}" \
       --is_training 1 \
       --model_id "${model_id}" \
