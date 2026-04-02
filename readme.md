@@ -24,7 +24,7 @@ AHuber avoids all-to-all attention by using a learnable **Global Hub** vector. I
 
 ## ✨ Key Features
 
-*   **📉 Linear Complexity:** Achieves $\mathcal{O}(N \cdot L)$ complexity. Memory usage grows linearly, avoiding OOM errors on high-dimensional datasets where Vanilla Transformer fails.
+*   **📉 Linear Complexity:** Achieves $\mathcal{O}(N)$ complexity. Memory usage grows linearly, avoiding OOM errors on high-dimensional datasets where Vanilla Transformer fails.
 *   **🔄 Dual-Pathway Mechanism:** A "State" and "Detail“ decoupling mechanism:
     1.  **Latent Pathway:** Captures evolving global dependencies via a centralized attentive bottleneck.
     2.  **Physical Pathway:** Bypasses the bottleneck to explicitly reconstruct high-frequency details in the time domain.
@@ -86,10 +86,3 @@ You can reproduce our experiments (e.g., on the Traffic dataset), run the provid
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgement
-
-We appreciate the following GitHub repos for their valuable code base:
-*   [PatchTST](https://github.com/yuqinie98/PatchTST)
-*   [iTransformer](https://github.com/thuml/iTransformer)
-*   [SOFTS](https://github.com/Secilia-Cxy/SOFTS)
----
