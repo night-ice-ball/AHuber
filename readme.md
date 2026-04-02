@@ -33,9 +33,7 @@ The AHuber framework elegantly synchronizes two core components across its netwo
 1. **Active Aggregation & Contextual Distribution:** The single Evolving Hub token queries all variates to actively build a global context, then variates individually query the Hub to retrieve tailored refinement patterns. No dense $N \times N$ matrix multiplications are ever performed.
 2. **Iterative Time-Domain Repair:** A lightweight temporal reconstructor maps the latent updates back to the sequence dimension, injecting high-frequency, complex interactions specifically where the unhindered Explicit Bypass falls short.
 
-*(Include your architectural diagram here)*
-![AHuber Architecture](./pic/architecture_contrast.pdf) <!-- Consider replacing with your detailed Fig. 2 / AHuber.png -->
-
+![AHuber Architecture](./pic/AHuber.png) 
 ## 📊 Performance & Efficiency
 
 AHuber establishes new state-of-the-art accuracy across major benchmarks while showcasing an optimal efficiency-performance trade-off.
