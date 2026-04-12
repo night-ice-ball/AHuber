@@ -24,17 +24,17 @@ do
       --features M \
       --seq_len "${seq_len}" \
       --pred_len "${pred_len}" \
-      --e_layers 4 \
+      --e_layers 3 \
       --n_heads 8 \
-      --d_model 128 \
-      --d_ff 256 \
+      --d_model 128\
+      --d_ff 512 \
       --d_hub 1 \
-      --dropout 0.2 \
+      --dropout 0.2\
       --head_dropout 0 \
       --train_epochs 20 \
       --itr 1 \
       --batch_size 128 \
-      --learning_rate 0.0001\
+      --learning_rate 0.0003\
       > "${log_file}" 2>&1
 
     echo "Finished run: ${model_id}, log -> ${log_file}"
