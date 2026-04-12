@@ -67,10 +67,10 @@ AHuber establishes new state-of-the-art accuracy across major benchmarks while s
 
 ## ⚡ Usage
 
-To reproduce our experiments (e.g., on the Traffic dataset), run the provided script:
+To reproduce our experiments (e.g., on the Electricity dataset), run the provided script:
 
 ```bash
-scripts/traffic.sh
+scripts/electricity.sh
 ```
 
 ## 📜 License
