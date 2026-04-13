@@ -9,7 +9,7 @@ model_id_name=ETTh2
 data_name=ETTh2
 random_seed=2021
 
-for pred_len in 96 192 336 720
+for pred_len in 96 192 
 do
     model_id="${model_id_name}_${seq_len}_${pred_len}"
     log_file="logs/${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
@@ -39,7 +39,7 @@ do
     echo "Finished run: ${model_id}, log -> ${log_file}"
 done
 
-for pred_len in 720
+for pred_len in 336 720
 do
     model_id="${model_id_name}_${seq_len}_${pred_len}"
     log_file="logs/${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
@@ -54,15 +54,17 @@ do
       --features M \
       --seq_len "${seq_len}" \
       --pred_len "${pred_len}" \
-      --e_layers 3 \
+      --e_layers 1 \
       --n_heads 4 \
-      --d_model 64 \
+      --d_model 128 \
       --d_ff 256 \
       --dropout 0.3 \
       --head_dropout 0 \
+      --patch_len 16 \
+      --stride 16 \
       --train_epochs 20 \
       --itr 1 \
-      --batch_size 64 \
+      --batch_size 256 \
       --learning_rate 0.0001 \
       > "${log_file}" 2>&1
 
