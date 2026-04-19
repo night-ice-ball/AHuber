@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-1.10%2B-orange)](https://pytorch.org/)
 
-**AHuber** is a novel, prior-agnostic Transformer architecture built on the principle of **Rank-Decoupled Iterative Refinement** for multivariate time series forecasting. It completely breaks the quadratic computational bottleneck of dense cross-variate attention, achieving **strict linear complexity $\mathcal{O}(N)$** while outperforming existing efficient models.
+**AHuber** is a Transformer architecture built on the principle of **Rank-Decoupled Iterative Refinement** for **multivariate time series forecasting**. It breaks the quadratic computational bottleneck of dense cross-variate attention, achieving **strict linear complexity $\mathcal{O}(N)$** while outperforming existing efficient models.
 
 **Core Philosophy:** Real-world multivariate data contains both stable structural patterns (Low-Rank) and complex fine-grained interactions (High-Rank). Forcing all this into a single static bottleneck causes severe information blurring. Instead, AHuber explicitly decouples the learning pathways: an **Explicit Bypass** nativesly preserves the structural low-rank skeletons, while a context-aware **Evolving Hub** actively distills and injects high-rank temporal details.
 
@@ -28,10 +28,10 @@ Instead of relying on heuristic statistical pooling or rigid temporal decomposit
 
 ## 🧠 Model Architecture
 
-The AHuber framework elegantly synchronizes two core components across its network depth:
+The AHuber framework synchronizes two core components across its network depth:
 
 1. **Active Aggregation & Contextual Distribution:** The single Evolving Hub token queries all variates to actively build a global context, then variates individually query the Hub to retrieve tailored refinement patterns. No dense $N \times N$ matrix multiplications are ever performed.
-2. **Iterative Time-Domain Repair:** A lightweight temporal reconstructor maps the latent updates back to the sequence dimension, injecting high-frequency, complex interactions specifically where the unhindered Explicit Bypass falls short.
+2. **Iterative Time-Domain Repair:** A lightweight temporal reconstructor maps the latent updates back to the sequence dimension, injecting complex interactions specifically where the unhindered Explicit Bypass falls short.
 
 ![AHuber Architecture](./pic/AHuber.png) 
 ## 📊 Performance & Efficiency
@@ -41,12 +41,10 @@ AHuber establishes new state-of-the-art accuracy across major benchmarks while s
 ### Accuracy (Avg. MSE)
 | Model | Traffic ($N=862$, $L \in \{336..720\}$) | Electricity ($N=321$) | Weather ($N=21$) | Solar ($N=137$) |
 | :--- | :---: | :---: | :---: | :---: |
-| **AHuber (Ours)** | **0.386** | **0.159** | 0.226 | **0.199** |
-| PatchTST | 0.391 | **0.159** | **0.225** | 0.200 |
-| iTransformer | 0.397 | 0.163 | 0.232 | 0.202 |
-| SOFTS | **0.381** | 0.164 | 0.234 | 0.209 |
-
-*(Note: Data aggregated from multiple extended look-back window experiments)*
+| **AHuber (Ours)** | **0.385** | **0.157** | **0.225** | **0.198** |
+| PatchTST | 0.403 | 0.159 | **0.225** | 0.200 |
+| iTransformer | **0.362** | 0.164 | 0.232 | 0.199 |
+| SOFTS | 0.381 | 0.164 | 0.234 | 0.208 |
 
 ### Efficiency (Evaluated on Traffic dataset, $N=862$)
 *   **Peak Memory Footprint:** AHuber consumes **~0.1 GB**, while iTransformer requires **>1.1 GB** (An $11\times$ massive reduction).
