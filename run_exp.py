@@ -35,6 +35,7 @@ if __name__ == '__main__':
 
     # ===== AHuber Model Core Params =====
     parser.add_argument('--e_layers', type=int, default=3, help='number of encoder layers')
+    parser.add_argument('--d_layers', type=int, default=1, help='num of decoder layers')
     parser.add_argument('--n_heads', type=int, default=8, help='number of heads')
     parser.add_argument('--d_model', type=int, default=128, help='dimension of model')
     parser.add_argument('--d_ff', type=int, default=256, help='dimension of fcn')
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--subtract_last', type=int, default=0, help='RevIN mode (0: subtract mean, 1: subtract last)')
 
     # ===== Optimizer & Training Config =====
-    parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
+    parser.add_argument('--num_workers', type=int, default=0, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=1, help='experiments times')
     parser.add_argument('--train_epochs', type=int, default=16, help='train epochs')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size of train input data')
@@ -78,13 +79,29 @@ if __name__ == '__main__':
     parser.add_argument('--crossformer_factor', type=int, default=10, help='num of routers in Cross-Dimension Stage of TSA (c)')
     # PatchTST
     parser.add_argument('--patch_len', type=int, default=16, help='patch length')
-    parser.add_argument('--stride', type=int, default=16, help='patch stride')
+    parser.add_argument('--stride', type=int, default=8, help='patch stride')
     parser.add_argument('--fc_dropout', type=float, default=0.1, help='fully connected layer dropout')
     parser.add_argument('--padding_patch', type=str, default=None)
     parser.add_argument('--head_dropout', type=float, default=0, help='head Dropout')
     # SOFTS
     parser.add_argument('--d_core', type=int, default=128, help='STAR dimension')
-    
+    # TimesNet
+    parser.add_argument('--top_k', type=int, default=5, help='for TimesBlock')
+    parser.add_argument('--num_kernels', type=int, default=6, help='for Inception')
+    parser.add_argument('--task_name', type=str, default='long_term_forecast',
+                        help='task name, options:[long_term_forecast, short_term_forecast, imputation, classification, anomaly_detection]')
+    # TiDE
+    parser.add_argument('--feat_size', type=int, default=128, help='feature size')
+    parser.add_argument('--hidden_size', type=int, default=128, help='hidden size')
+    parser.add_argument('--num_encoder_layers', type=int, default=3, help='number of encoder layers')
+    parser.add_argument('--num_decoder_layers', type=int, default=3, help='number of decoder layers')
+    parser.add_argument('--decoder_output_dim', type=int, default=128, help='output dimension of the decoder')
+    parser.add_argument('--temporal_decoder_hidden', type=int, default=128, help='hidden dimension of the temporal decoder')
+    # Others
+    parser.add_argument('--output_hidden_states', action='store_true', default=False, help='output hidden states for visualization')
+    parser.add_argument('--dec_in', type=str, default=None)
+    parser.add_argument('--c_out', type=str, default=None)
+    parser.add_argument('--des Exp', type=str, default=None)
     args = parser.parse_args()
 
     # === Auto-configure params based on dataset ===
@@ -123,7 +140,8 @@ if __name__ == '__main__':
         device_ids = args.devices.split(',')
         args.device_ids = [int(id_) for id_ in device_ids]
         args.gpu = args.device_ids[0]
-
+    if args.c_out is None:
+        args.c_out = args.enc_in  
     print('Args in experiment:')
     print(args)
 

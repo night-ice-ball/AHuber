@@ -10,6 +10,7 @@ class Model(nn.Module):
             c_in=configs.enc_in,
             seq_len=configs.seq_len,
             pred_len=configs.pred_len,
+            d_hub=configs.d_hub,
             d_model=configs.d_model,
             d_ff=configs.d_ff,
             n_heads=configs.n_heads,

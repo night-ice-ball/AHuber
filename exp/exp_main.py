@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
-from models import AHuber, PatchTST, iTransformer, DLinear, SOFTS, Crossformer, TiDE
+from models import AHuber, PatchTST, iTransformer, DLinear, SOFTS, TiDE, PatchMLP, TimesNet
 import inspect 
 
 import os
@@ -28,10 +28,11 @@ class Exp_Main(Exp_Basic):
             'PatchTST': PatchTST,
             'iTransformer': iTransformer,
             'AHuber': AHuber,
-            'Crossformer': Crossformer,
             'DLinear': DLinear,
             'SOFTS': SOFTS,
-            'TiDE': TiDE,
+            'PatchMLP': PatchMLP,
+            'TimesNet': TimesNet,
+            'TiDE': TiDE
         }
         model = self.model_dict[self.args.model].Model(self.args).float()
         
