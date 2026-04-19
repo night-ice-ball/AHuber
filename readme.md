@@ -11,7 +11,7 @@
 ## 🚀 The Dilemma & Our Solution
 
 In Multivariate Time Series Forecasting (MTSF), existing paradigms face a fundamental dilemma:
-*   **Quadratic Redundancy ($\mathcal{O}(N^2)$):** Standard channel-mixing Transformers capture cross-variate correlations effectively but incur massive, prohibitive computational overhead, often overfitting on sparse real-world dependencies.
+*   **Quadratic Redundancy :** Standard channel-mixing Transformers capture cross-variate correlations effectively but incur massive, prohibitive computational overhead, often overfitting on sparse real-world dependencies.
 *   **Statistical Fragility (The Bottleneck Dilemma):** Recent efficient models (e.g., simple pooling or static bottlenecks) rely on rigid statistical compression (like weighted averaging). This passive, non-adaptive aggregation forces stable intrinsic structures to entangle with nuanced sequence variations, resulting in irreversible **information blurring**.
 
 **AHuber solves this via Active Rank-Decoupled Refinement:**
